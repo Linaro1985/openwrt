@@ -650,6 +650,14 @@ define Device/tplink_c20-v1
 endef
 TARGET_DEVICES += tplink_c20-v1
 
+define Device/tuoshi_ts7620n
+  DTS := TS7620N
+  IMAGE_SIZE := $(ralink_default_fw_size_8M)
+  DEVICE_TITLE := Tuoshi TS7620N
+  DEVICE_PACKAGES := kmod-usb2 kmod-usb-ohci kmod-usb-ledtrig-usbport
+endef
+TARGET_DEVICES += tuoshi_ts7620n
+
 define Device/vonets_var11n-300
   DTS := VAR11N-300
   IMAGE_SIZE := $(ralink_default_fw_size_4M)
