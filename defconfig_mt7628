@@ -1,0 +1,173 @@
+CONFIG_TARGET_ramips=y
+CONFIG_TARGET_ramips_mt76x8=y
+CONFIG_TARGET_MULTI_PROFILE=y
+CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_kroks_kndrt31r26=y
+CONFIG_TARGET_DEVICE_PACKAGES_ramips_mt76x8_DEVICE_kroks_kndrt31r26=""
+CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_kroks_kndrt31r3=y
+CONFIG_TARGET_DEVICE_PACKAGES_ramips_mt76x8_DEVICE_kroks_kndrt31r3=""
+CONFIG_ALL_KMODS=y
+CONFIG_ALL_NONSHARED=y
+CONFIG_DEVEL=y
+CONFIG_TARGET_PER_DEVICE_ROOTFS=y
+CONFIG_AUTOREMOVE=y
+CONFIG_BPF_TOOLCHAIN_BUILD_LLVM=y
+# CONFIG_BPF_TOOLCHAIN_NONE is not set
+CONFIG_BUILDBOT=y
+CONFIG_CCACHE=y
+CONFIG_HAS_BPF_TOOLCHAIN=y
+CONFIG_IMAGEOPT=y
+CONFIG_KERNEL_BUILD_DOMAIN="buildhost"
+CONFIG_KERNEL_BUILD_USER="builder"
+# CONFIG_KERNEL_KALLSYMS is not set
+CONFIG_PACKAGE_cgi-io=y
+CONFIG_PACKAGE_libbpf=m
+CONFIG_PACKAGE_libelf=m
+CONFIG_PACKAGE_liblucihttp=y
+CONFIG_PACKAGE_liblucihttp-ucode=y
+CONFIG_PACKAGE_libpcap=m
+CONFIG_PACKAGE_libxdp=m
+CONFIG_PACKAGE_luci=y
+CONFIG_PACKAGE_luci-app-firewall=y
+CONFIG_PACKAGE_luci-app-opkg=y
+CONFIG_PACKAGE_luci-base=y
+CONFIG_PACKAGE_luci-light=y
+CONFIG_PACKAGE_luci-mod-admin-full=y
+CONFIG_PACKAGE_luci-mod-network=y
+CONFIG_PACKAGE_luci-mod-status=y
+CONFIG_PACKAGE_luci-mod-system=y
+CONFIG_PACKAGE_luci-proto-ipv6=y
+CONFIG_PACKAGE_luci-proto-ppp=y
+CONFIG_PACKAGE_luci-ssl=y
+CONFIG_PACKAGE_luci-theme-bootstrap=y
+CONFIG_PACKAGE_px5g-mbedtls=y
+CONFIG_PACKAGE_qosify=m
+CONFIG_PACKAGE_rpcd=y
+CONFIG_PACKAGE_rpcd-mod-file=y
+CONFIG_PACKAGE_rpcd-mod-iwinfo=y
+CONFIG_PACKAGE_rpcd-mod-luci=y
+CONFIG_PACKAGE_rpcd-mod-rrdns=y
+CONFIG_PACKAGE_rpcd-mod-ucode=y
+CONFIG_PACKAGE_tc-tiny=m
+CONFIG_PACKAGE_ucode-mod-html=y
+CONFIG_PACKAGE_ucode-mod-math=y
+CONFIG_PACKAGE_uhttpd=y
+CONFIG_PACKAGE_uhttpd-mod-ubus=y
+CONFIG_PACKAGE_xdp-filter=m
+CONFIG_PACKAGE_xdp-loader=m
+CONFIG_PACKAGE_xdpdump=m
+CONFIG_PACKAGE_zlib=m
+CONFIG_REPRODUCIBLE_DEBUG_INFO=y
+# CONFIG_TARGET_ROOTFS_INITRAMFS is not set
+CONFIG_USE_LLVM_BUILD=y
+CONFIG_VERSIONOPT=y
+CONFIG_VERSION_BUG_URL=""
+CONFIG_VERSION_CODE=""
+CONFIG_VERSION_DIST="OpenWrt"
+CONFIG_VERSION_FILENAMES=y
+CONFIG_VERSION_HOME_URL=""
+CONFIG_VERSION_HWREV=""
+CONFIG_VERSION_MANUFACTURER=""
+CONFIG_VERSION_MANUFACTURER_URL=""
+CONFIG_VERSION_NUMBER=""
+CONFIG_VERSION_PRODUCT=""
+CONFIG_VERSION_REPO="https://downloads.openwrt.org/releases/23.05.0-rc2"
+CONFIG_VERSION_SUPPORT_URL=""
+# CONFIG_COLLECT_KERNEL_DEBUG is not set
+# CONFIG_IB is not set
+# CONFIG_MAKE_TOOLCHAIN is not set
+# CONFIG_PACKAGE_ravpower-mcu is not set
+# CONFIG_SDK is not set
+# CONFIG_SDK_LLVM_BPF is not set
+# CONFIG_TARGET_ALL_PROFILES is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_alfa-network_awusfree1 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_asus_rt-ac1200 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_asus_rt-ac1200-v2 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_asus_rt-n12-vp-b1 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_buffalo_wcr-1166ds is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_comfast_cf-wr617ac is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_comfast_cf-wr758ac-v1 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_comfast_cf-wr758ac-v2 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_cudy_wr1000 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_d-team_pbr-d1 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_dlink_dap-1325-a1 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_duzun_dm06 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_elecom_wrc-1167fs is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_glinet_gl-mt300n-v2 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_glinet_microuter-n300 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_glinet_vixmini is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_hak5_wifi-pineapple-mk7 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_hilink_hlk-7628n is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_hilink_hlk-7688a is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_hiwifi_hc5611 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_hiwifi_hc5661a is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_hiwifi_hc5761a is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_hiwifi_hc5861b is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_iptime_a3 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_iptime_a604m is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_jotale_js76x8-16m is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_jotale_js76x8-32m is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_jotale_js76x8-8m is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_keenetic_kn-1613 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_kroks_kndrt31r16 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_kroks_kndrt31r19 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_linksys_e5400 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_mediatek_linkit-smart-7688 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_mediatek_mt7628an-eval-board is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_mercury_mac1200r-v2 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_minew_g1-c is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_motorola_mwr03 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_netgear_r6020 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_netgear_r6080 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_netgear_r6120 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_onion_omega2 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_onion_omega2p is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_oraybox_x1 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_rakwireless_rak633 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_ravpower_rp-wd009 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_skylab_skw92a is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tama_w06 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_totolink_a3 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_totolink_lr1200 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_archer-c20-v4 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_archer-c20-v5 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_archer-c50-v3 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_archer-c50-v4 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_re200-v2 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_re200-v3 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_re200-v4 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_re220-v2 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_re305-v1 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_re305-v3 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_tl-mr3020-v3 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_tl-mr3420-v5 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_tl-mr6400-v4 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_tl-mr6400-v5 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_tl-wa801nd-v5 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_tl-wr802n-v4 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_tl-wr840n-v4 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_tl-wr841n-v13 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_tl-wr842n-v5 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_tl-wr850n-v2 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_tplink_tl-wr902ac-v3 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_unielec_u7628-01-16m is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_vocore_vocore2 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_vocore_vocore2-lite is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_wavlink_wl-wn531a3 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_wavlink_wl-wn570ha1 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_wavlink_wl-wn575a3 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_wavlink_wl-wn576a2 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_wavlink_wl-wn577a2 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_wavlink_wl-wn578a2 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_widora_neo-16m is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_widora_neo-32m is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_wiznet_wizfi630s is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_wrtnode_wrtnode2p is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_wrtnode_wrtnode2r is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_xiaomi_mi-ra75 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_xiaomi_mi-router-4a-100m is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_xiaomi_mi-router-4a-100m-intl is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_xiaomi_mi-router-4c is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_xiaomi_miwifi-3c is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_xiaomi_miwifi-nano is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_zbtlink_zbt-we1226 is not set
+# CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_zyxel_keenetic-extra-ii is not set
