@@ -1226,6 +1226,15 @@ define Device/trendnet_tew-810dr
 endef
 TARGET_DEVICES += trendnet_tew-810dr
 
+define Device/tuoshi_ts7620n
+  SOC := mt7620n
+  IMAGE_SIZE := 7552k
+  DEVICE_VENDOR := Tuoshi
+  DEVICE_MODEL := TS7620N
+  DEVICE_PACKAGES := kmod-usb2 kmod-usb-ohci kmod-usb-ledtrig-usbport
+endef
+TARGET_DEVICES += tuoshi_ts7620n
+
 define Device/vonets_var11n-300
   SOC := mt7620n
   IMAGE_SIZE := 3776k
