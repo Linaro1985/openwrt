@@ -334,6 +334,17 @@ define Device/keenetic_kn-1613
 endef
 TARGET_DEVICES += keenetic_kn-1613
 
+define Device/kroks_kndrt31r3
+  IMAGE_SIZE := 16064k
+  DEVICE_VENDOR := Kroks
+  DEVICE_MODEL := Rt-Cse5 mXW
+  DEVICE_ALT0_VENDOR := Kroks
+  DEVICE_ALT0_MODEL := KNdRt31R3
+  DEVICE_PACKAGES := kmod-usb2 uqmi
+  SUPPORTED_DEVICES += kndrt31r3
+endef
+TARGET_DEVICES += kroks_kndrt31r3
+
 define Device/kroks_kndrt31r16
   IMAGE_SIZE := 16064k
   DEVICE_VENDOR := Kroks
@@ -355,6 +366,17 @@ define Device/kroks_kndrt31r19
   SUPPORTED_DEVICES += kndrt31r19
 endef
 TARGET_DEVICES += kroks_kndrt31r19
+
+define Device/kroks_kndrt31r26
+  IMAGE_SIZE := 16064k
+  DEVICE_VENDOR := Kroks
+  DEVICE_MODEL := Rt-Cse4 mXW
+  DEVICE_ALT0_VENDOR := Kroks
+  DEVICE_ALT0_MODEL := KNdRt31R26
+  DEVICE_PACKAGES := kmod-usb2 uqmi
+  UPPORTED_DEVICES += kndrt31r26
+endef
+TARGET_DEVICES += kroks_kndrt31r26
 
 define Device/linksys_e5400
   IMAGE_SIZE := 16000k

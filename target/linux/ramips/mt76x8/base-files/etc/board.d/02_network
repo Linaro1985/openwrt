@@ -40,6 +40,7 @@ ramips_setup_interfaces()
 	hilink,hlk-7628n|\
 	hilink,hlk-7688a|\
 	hiwifi,hc5861b|\
+	kroks,kndrt31r3|\
 	kroks,kndrt31r16|\
 	skylab,skw92a|\
 	tplink,archer-c20-v4|\
@@ -79,7 +80,8 @@ ramips_setup_interfaces()
 		ucidef_add_switch "switch0" \
 			"3:lan" "4:wan" "6@eth0"
 		;;
-	comfast,cf-wr617ac)
+	comfast,cf-wr617ac|\
+	kroks,kndrt31r26)
 		ucidef_add_switch "switch0" \
 			"1:lan:3" "2:lan:2" "3:lan:1" "4:wan" "6@eth0"
 		;;
@@ -228,6 +230,8 @@ ramips_setup_macs()
 		label_mac=$(mtd_get_mac_binary factory 0x4)
 		;;
 	duzun,dm06|\
+	kroks,kndrt31r3|\
+	kroks,kndrt31r26|\
 	netgear,r6020|\
 	netgear,r6080|\
 	netgear,r6120|\

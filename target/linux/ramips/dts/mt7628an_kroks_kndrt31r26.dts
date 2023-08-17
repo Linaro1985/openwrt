@@ -1,0 +1,152 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+
+#include "mt7628an.dtsi"
+
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	compatible = "kroks,kndrt31r26", "mediatek,mt7628an-soc";
+	model = "Kroks KNdRt31R26";
+
+	aliases {
+		led-boot = &led_status;
+		led-failsafe = &led_status;
+		led-running = &led_status;
+		led-upgrade = &led_status;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led_status: status {
+			label = "green:status";
+			gpios = <&gpio 2 GPIO_ACTIVE_LOW>;
+		};
+
+		wifi {
+			label = "green:wifi";
+			gpios = <&gpio 44 GPIO_ACTIVE_LOW>;
+			linux,default-trigger = "phy0tpt";
+		};
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		reset {
+			label = "reset";
+			gpios = <&gpio 38 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+
+	gpio_export {
+		compatible = "gpio-export";
+		#size-cells = <0>;
+
+		modem1power {
+			gpio-export,name = "modem1power";
+			gpio-export,output = <1>;
+			gpios = <&gpio 1 GPIO_ACTIVE_HIGH>;
+		};
+	};
+};
+
+&spi0 {
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <25000000>;
+		broken-flash-reset;
+		m25p,fast-read;
+
+		partitions: partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x0 0x30000>;
+				read-only;
+			};
+
+			partition@30000 {
+				label = "u-boot-env";
+				reg = <0x30000 0x10000>;
+			};
+
+			factory: partition@40000 {
+				label = "factory";
+				reg = <0x40000 0x10000>;
+				read-only;
+			};
+
+			partition@50000 {
+				compatible = "denx,uimage";
+				label = "firmware";
+				reg = <0x50000 0xeb0000>;
+			};
+
+			partition@f00000 {
+				label = "memory";
+				reg = <0xf00000 0x100000>;
+			};
+		};
+	};
+};
+
+&esw {
+	mediatek,led_source = <4>;
+	mediatek,portmap = <0x2f>;
+};
+
+&ethernet {
+	nvmem-cells = <&macaddr_factory_4>;
+	nvmem-cell-names = "mac-address";
+};
+
+&wmac {
+	status = "okay";
+	mediatek,mtd-eeprom = <&factory 0x0000>;
+};
+
+&state_default {
+	gpio {
+		groups = "i2s", "wdt", "wled_an";
+		function = "gpio";
+	};
+
+	p1led_an {
+		groups = "p1led_an";
+		function = "p1led_an";
+	};
+
+	p2led_an {
+		groups = "p2led_an";
+		function = "p2led_an";
+	};
+
+	p3led_an {
+		groups = "p3led_an";
+		function = "p3led_an";
+	};
+
+	p4led_an {
+		groups = "p4led_an";
+		function = "p4led_an";
+	};
+};
+
+&factory {
+	compatible = "nvmem-cells";
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	macaddr_factory_4: macaddr@4 {
+		reg = <0x4 0x6>;
+	};
+};
