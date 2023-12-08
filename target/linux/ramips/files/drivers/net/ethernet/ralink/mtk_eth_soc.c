@@ -149,7 +149,7 @@ void fe_reset_fe(struct fe_priv *priv)
 	reset_control_assert(priv->rst_fe);
 	usleep_range(60, 120);
 	reset_control_deassert(priv->rst_fe);
-	usleep_range(60, 120);
+	usleep_range(1000, 1200);
 }
 
 static inline void fe_int_disable(u32 mask)
@@ -1595,9 +1595,7 @@ static int fe_probe(struct platform_device *pdev)
 
 	priv = netdev_priv(netdev);
 	spin_lock_init(&priv->page_lock);
-	priv->rst_fe = devm_reset_control_get(&pdev->dev, "fe");
-	if (IS_ERR(priv->rst_fe))
-		priv->rst_fe = NULL;
+	priv->rst_fe = devm_reset_control_array_get_optional_exclusive(&pdev->dev);
 
 	if (soc->init_data)
 		soc->init_data(soc, netdev);

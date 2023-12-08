@@ -1441,12 +1441,8 @@ static int esw_probe(struct platform_device *pdev)
 	if (reg_init)
 		esw->reg_led_source = be32_to_cpu(*reg_init);
 
-	esw->rst_esw = devm_reset_control_get(&pdev->dev, "esw");
-	if (IS_ERR(esw->rst_esw))
-		esw->rst_esw = NULL;
-	esw->rst_ephy = devm_reset_control_get(&pdev->dev, "ephy");
-	if (IS_ERR(esw->rst_ephy))
-		esw->rst_ephy = NULL;
+	esw->rst_esw = devm_reset_control_get_optional_exclusive(&pdev->dev, "esw");
+	esw->rst_ephy = devm_reset_control_get_optional_exclusive(&pdev->dev, "ephy");
 
 	spin_lock_init(&esw->reg_rw_lock);
 	platform_set_drvdata(pdev, esw);
