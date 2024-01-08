@@ -1,0 +1,33 @@
+From 9b3007c71a1b59b1ae58cfd26ec19ae180f13c6c Mon Sep 17 00:00:00 2001
+From: Andris PE <neandris@gmail.com>
+Date: Sat, 14 Oct 2023 12:51:00 +0300
+Subject: [PATCH 08/10] ruleset: do not emit redundant drop invalid rules
+
+The wan interface drop rule unnecessarily persists when invalid state
+is dropped globally and the rule cannot catch anything at all, so remove
+it as the effect is achieved by default and to global extent.
+
+Fixes: 119ee1a ("ruleset: drop ctstate invalid traffic for masq-enabled zones")
+Signed-off-by: Andris PE <neandris@gmail.com>
+[fix S-o-b tag, fix commit author, reword commit subject and message]
+Signed-off-by: Jo-Philipp Wich <jo@mein.io>
+---
+ root/usr/share/firewall4/templates/ruleset.uc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/root/usr/share/firewall4/templates/ruleset.uc b/root/usr/share/firewall4/templates/ruleset.uc
+index 4210d64..bcfd0d5 100644
+--- a/root/usr/share/firewall4/templates/ruleset.uc
++++ b/root/usr/share/firewall4/templates/ruleset.uc
+@@ -276,7 +276,7 @@ table inet fw4 {
+ {%   if (zone.dflags[verdict]): %}
+ 	chain {{ verdict }}_to_{{ zone.name }} {
+ {%   for (let rule in zone.match_rules): %}
+-{%     if (verdict == "accept" && (zone.masq || zone.masq6) && !zone.masq_allow_invalid): %}
++{%     if (!fw4.default_option("drop_invalid") && verdict == "accept" && (zone.masq || zone.masq6) && !zone.masq_allow_invalid): %}
+ 		{%+ include("zone-drop-invalid.uc", { fw4, zone, rule }) %}
+ {%     endif %}
+ 		{%+ include("zone-verdict.uc", { fw4, zone, rule, egress: true, verdict }) %}
+-- 
+2.42.1
+

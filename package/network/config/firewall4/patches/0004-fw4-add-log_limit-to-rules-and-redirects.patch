@@ -1,0 +1,557 @@
+From 58bc2422f09b1909c88a4175e369f3b326dbf859 Mon Sep 17 00:00:00 2001
+From: Luiz Angelo Daros de Luca <luizluca@gmail.com>
+Date: Tue, 1 Aug 2023 16:51:58 -0300
+Subject: [PATCH 04/10] fw4: add log_limit to rules and redirects
+
+Just like zone log_limit, now you can specify a different log limit to a
+single rule or redirect.
+
+Signed-off-by: Luiz Angelo Daros de Luca <luizluca@gmail.com>
+[whitespace cleanup, properly format limit expressions]
+Signed-off-by: Jo-Philipp Wich <jo@mein.io>
+---
+ .../usr/share/firewall4/templates/redirect.uc |   5 +-
+ root/usr/share/firewall4/templates/rule.uc    |   5 +-
+ root/usr/share/ucode/fw4.uc                   |   2 +
+ tests/02_zones/08_log_limit                   | 477 ++++++++++++++++++
+ 4 files changed, 487 insertions(+), 2 deletions(-)
+ create mode 100644 tests/02_zones/08_log_limit
+
+diff --git a/root/usr/share/firewall4/templates/redirect.uc b/root/usr/share/firewall4/templates/redirect.uc
+index c1310a7..f24872c 100644
+--- a/root/usr/share/firewall4/templates/redirect.uc
++++ b/root/usr/share/firewall4/templates/redirect.uc
+@@ -61,7 +61,10 @@
+ 	{{ fw4.concat(redirect.ipset.fields) }}{{
+ 		redirect.ipset.invert ? ' !=' : ''
+ 	}} @{{ redirect.ipset.name }} {%+ endif -%}
+-{%+ if (redirect.log && zone?.log_limit): -%}
++{%+ if (redirect.log && redirect.log_limit): -%}
++	limit rate {{ redirect.log_limit.rate }}/{{ redirect.log_limit.unit }} log prefix {{ fw4.quote(redirect.log, true) }}
++		{%+ include("redirect.uc", { fw4, zone, redirect: { ...redirect, log: 0 } }) %}
++{%+ elif (redirect.log && zone?.log_limit): -%}
+ 	limit name "{{ zone.name }}.log_limit" log prefix {{ fw4.quote(redirect.log, true) }}
+ 		{%+ include("redirect.uc", { fw4, zone, redirect: { ...redirect, log: 0 } }) %}
+ {%+ else -%}
+diff --git a/root/usr/share/firewall4/templates/rule.uc b/root/usr/share/firewall4/templates/rule.uc
+index 274fb70..2843d92 100644
+--- a/root/usr/share/firewall4/templates/rule.uc
++++ b/root/usr/share/firewall4/templates/rule.uc
+@@ -69,7 +69,10 @@
+ 	{{ fw4.concat(rule.ipset.fields) }}{{
+ 		rule.ipset.invert ? ' !=' : ''
+ 	}} @{{ rule.ipset.name }} {%+ endif -%}
+-{%+ if (rule.log && zone?.log_limit): -%}
++{%+ if (rule.log && rule.log_limit): -%}
++	limit rate {{ rule.log_limit.rate }}/{{ rule.log_limit.unit }} log prefix {{ fw4.quote(rule.log, true) }}
++		{%+ include("rule.uc", { fw4, zone, rule: { ...rule, log: 0 } }) %}
++{%+ elif (rule.log && zone?.log_limit): -%}
+ 	limit name "{{ zone.name }}.log_limit" log prefix {{ fw4.quote(rule.log, true) }}
+ 		{%+ include("rule.uc", { fw4, zone, rule: { ...rule, log: 0 } }) %}
+ {%+ else -%}
+diff --git a/root/usr/share/ucode/fw4.uc b/root/usr/share/ucode/fw4.uc
+index 7b6eb18..551811a 100644
+--- a/root/usr/share/ucode/fw4.uc
++++ b/root/usr/share/ucode/fw4.uc
+@@ -2317,6 +2317,7 @@ return {
+ 
+ 			counter: [ "bool", "1" ],
+ 			log: [ "string" ],
++			log_limit: [ "limit" ],
+ 
+ 			target: [ "target" ]
+ 		});
+@@ -2633,6 +2634,7 @@ return {
+ 
+ 			counter: [ "bool", "1" ],
+ 			log: [ "string" ],
++			log_limit: [ "limit" ],
+ 
+ 			target: [ "target", "dnat" ]
+ 		});
+diff --git a/tests/02_zones/08_log_limit b/tests/02_zones/08_log_limit
+new file mode 100644
+index 0000000..35e5108
+--- /dev/null
++++ b/tests/02_zones/08_log_limit
+@@ -0,0 +1,477 @@
++Test that configured zone log limits are honored in emitted log rules.
++
++-- Testcase --
++{%
++	include("./root/usr/share/firewall4/main.uc", {
++		getenv: function(varname) {
++			switch (varname) {
++			case 'ACTION':
++				return 'print';
++			}
++		}
++	})
++%}
++-- End --
++
++-- File uci/firewall.json --
++{
++	"zone": [
++		{
++			".description": "test zone with log_limit",
++			"name": "lan",
++			"network": "lan",
++			"auto_helper": 0,
++			"log": 3,
++			"log_limit": "1/min"
++		},
++		{
++			".description": "test zone with MASQ and log_limit",
++			"name": "wan",
++			"network": "wan",
++			"auto_helper": 0,
++			"family": "ipv4",
++			"masq": 1,
++			"log": 3,
++			"log_limit": "2/min"
++		},
++		{
++			".description": "test zone with log_limit and no log",
++			"name": "guest",
++			"network": "guest",
++			"auto_helper": 0,
++			"log_limit": "3/min"
++		},
++		{
++			".description": "test zone with log and no limit, should produce multi target rules",
++			"name": "wan6",
++			"network": "wan6",
++			"auto_helper": 0,
++			"family": "ipv6",
++			"log": 1
++		}
++	],
++
++	"forwarding": [
++		{
++			"src": "lan",
++			"dest": "wan"
++		}
++	],
++
++	"rule": [
++		{
++			".description": "src lan log",
++			"proto": "tcp",
++			"src": "lan",
++			"dest_port": 1001,
++			"log": 1
++		},
++		{
++			".description": "src lan no log",
++			"proto": "tcp",
++			"src": "lan",
++			"dest_port": 1002,
++			"log": 0
++		},
++		{
++			".description": "dest lan log",
++			"proto": "tcp",
++			"dest": "lan",
++			"dest_port": 1003,
++			"log": 1
++		},
++		{
++			".description": "dest lan no log",
++			"proto": "tcp",
++			"dest": "lan",
++			"dest_port": 1004,
++			"log": 0
++		},
++		{
++			".description": "Source any, dest lan, log",
++			"proto": "tcp",
++			"src": "*",
++			"dest": "lan",
++			"dest_port": 1005,
++			"log": 1
++		},
++		{
++			".description": "Source any, dest lan, no log",
++			"proto": "tcp",
++			"src": "*",
++			"dest": "lan",
++			"dest_port": 1006,
++			"log": 0
++		},
++		{
++			".description": "src any log",
++			"proto": "tcp",
++			"src": "*",
++			"dest_port": 1007,
++			"log": 1
++		},
++		{
++			".description": "src any no log",
++			"proto": "tcp",
++			"src": "*",
++			"dest_port": 1008,
++			"log": 0
++		},
++		{
++			"name": "Deny guest with no log",
++			"proto": "icmp",
++			"dest": "guest",
++			"target": "drop"
++		},
++		{
++			"name": "Deny guest with log",
++			"proto": "icmp",
++			"dest": "guest",
++			"target": "drop",
++			"log": 1
++		},
++		{
++			"name": "Deny rule #1",
++			"proto": "any",
++			"src": "lan",
++			"dest": "wan",
++			"src_ip": [ "192.168.1.2" ],
++			"target": "drop"
++		},
++		{
++			"name": "Deny rule #2",
++			"proto": "icmp",
++			"src": "lan",
++			"dest": "wan",
++			"src_ip": [ "192.168.1.3" ],
++			"target": "drop"
++		},
++		{
++			".description": "src any log",
++			"proto": "tcp",
++			"src": "*",
++			"dest_port": 1009,
++			"log": 1,
++			"log_limit": "5/min"
++		}
++	],
++	"redirect": [
++		{
++			"proto": "tcp",
++			"src": "wan",
++			"dest": "lan",
++			"dest_ip": "10.0.0.2",
++			"dest_port": "22",
++			"log": "1"
++		},
++		{
++			"proto": "tcp",
++			"src": "wan",
++			"dest": "lan",
++			"dest_ip": "10.0.0.2",
++			"dest_port": "23",
++			"log": "1",
++			"log_limit": "4/min"
++		}
++
++	]
++}
++-- End --
++
++-- File uci/helpers.json --
++{}
++-- End --
++
++-- Expect stdout --
++table inet fw4
++flush table inet fw4
++
++table inet fw4 {
++	#
++	# Defines
++	#
++
++	define lan_devices = { "br-lan" }
++	define lan_subnets = { 10.0.0.0/24, 192.168.26.0/24, 2001:db8:1000::/60, fd63:e2f:f706::/60 }
++
++	define wan_devices = { "pppoe-wan" }
++	define wan_subnets = { 10.11.12.0/24 }
++
++	define guest_devices = { "br-guest" }
++	define guest_subnets = { 10.1.0.0/24, 192.168.27.0/24, 2001:db8:1000::/60, fd63:e2f:f706::/60 }
++
++	define wan6_devices = { "pppoe-wan" }
++	define wan6_subnets = { 2001:db8:54:321::/64 }
++
++
++	#
++	# Limits
++	#
++
++	limit lan.log_limit {
++		comment "lan log limit"
++		rate 1/minute
++	}
++
++	limit wan.log_limit {
++		comment "wan log limit"
++		rate 2/minute
++	}
++
++	limit guest.log_limit {
++		comment "guest log limit"
++		rate 3/minute
++	}
++
++
++	#
++	# User includes
++	#
++
++	include "/etc/nftables.d/*.nft"
++
++
++	#
++	# Filter rules
++	#
++
++	chain input {
++		type filter hook input priority filter; policy drop;
++
++		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
++
++		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		tcp dport 1007 counter log prefix "@rule[6]: " comment "!fw4: @rule[6]"
++		tcp dport 1008 counter comment "!fw4: @rule[7]"
++		tcp dport 1009 limit rate 5/minute log prefix "@rule[12]: "
++		tcp dport 1009 counter comment "!fw4: @rule[12]"
++		iifname "br-lan" jump input_lan comment "!fw4: Handle lan IPv4/IPv6 input traffic"
++		meta nfproto ipv4 iifname "pppoe-wan" jump input_wan comment "!fw4: Handle wan IPv4 input traffic"
++		iifname "br-guest" jump input_guest comment "!fw4: Handle guest IPv4/IPv6 input traffic"
++		meta nfproto ipv6 iifname "pppoe-wan" jump input_wan6 comment "!fw4: Handle wan6 IPv6 input traffic"
++	}
++
++	chain forward {
++		type filter hook forward priority filter; policy drop;
++
++		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		tcp dport 1005 limit name "lan.log_limit" log prefix "@rule[4]: "
++		tcp dport 1005 counter comment "!fw4: @rule[4]"
++		tcp dport 1006 counter comment "!fw4: @rule[5]"
++		iifname "br-lan" jump forward_lan comment "!fw4: Handle lan IPv4/IPv6 forward traffic"
++		meta nfproto ipv4 iifname "pppoe-wan" jump forward_wan comment "!fw4: Handle wan IPv4 forward traffic"
++		iifname "br-guest" jump forward_guest comment "!fw4: Handle guest IPv4/IPv6 forward traffic"
++		meta nfproto ipv6 iifname "pppoe-wan" jump forward_wan6 comment "!fw4: Handle wan6 IPv6 forward traffic"
++	}
++
++	chain output {
++		type filter hook output priority filter; policy drop;
++
++		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
++
++		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		oifname "br-lan" jump output_lan comment "!fw4: Handle lan IPv4/IPv6 output traffic"
++		meta nfproto ipv4 oifname "pppoe-wan" jump output_wan comment "!fw4: Handle wan IPv4 output traffic"
++		oifname "br-guest" jump output_guest comment "!fw4: Handle guest IPv4/IPv6 output traffic"
++		meta nfproto ipv6 oifname "pppoe-wan" jump output_wan6 comment "!fw4: Handle wan6 IPv6 output traffic"
++	}
++
++	chain prerouting {
++		type filter hook prerouting priority filter; policy accept;
++	}
++
++	chain handle_reject {
++		meta l4proto tcp reject with tcp reset comment "!fw4: Reject TCP traffic"
++		reject with icmpx type port-unreachable comment "!fw4: Reject any other traffic"
++	}
++
++	chain input_lan {
++		tcp dport 1001 limit name "lan.log_limit" log prefix "@rule[0]: "
++		tcp dport 1001 counter comment "!fw4: @rule[0]"
++		tcp dport 1002 counter comment "!fw4: @rule[1]"
++		ct status dnat accept comment "!fw4: Accept port redirections"
++		jump drop_from_lan
++	}
++
++	chain output_lan {
++		tcp dport 1003 limit name "lan.log_limit" log prefix "@rule[2]: "
++		tcp dport 1003 counter comment "!fw4: @rule[2]"
++		tcp dport 1004 counter comment "!fw4: @rule[3]"
++		jump drop_to_lan
++	}
++
++	chain forward_lan {
++		ip saddr 192.168.1.2 counter jump drop_to_wan comment "!fw4: Deny rule #1"
++		meta l4proto icmp ip saddr 192.168.1.3 counter jump drop_to_wan comment "!fw4: Deny rule #2"
++		meta nfproto ipv4 jump accept_to_wan comment "!fw4: Accept lan to wan IPv4 forwarding"
++		ct status dnat accept comment "!fw4: Accept port forwards"
++		jump drop_to_lan
++		limit name "lan.log_limit" log prefix "drop lan forward: "
++	}
++
++	chain accept_to_lan {
++		oifname "br-lan" counter accept comment "!fw4: accept lan IPv4/IPv6 traffic"
++	}
++
++	chain drop_from_lan {
++		iifname "br-lan" limit name "lan.log_limit" log prefix "drop lan in: "
++		iifname "br-lan" counter drop comment "!fw4: drop lan IPv4/IPv6 traffic"
++	}
++
++	chain drop_to_lan {
++		oifname "br-lan" limit name "lan.log_limit" log prefix "drop lan out: "
++		oifname "br-lan" counter drop comment "!fw4: drop lan IPv4/IPv6 traffic"
++	}
++
++	chain input_wan {
++		ct status dnat accept comment "!fw4: Accept port redirections"
++		jump drop_from_wan
++	}
++
++	chain output_wan {
++		jump drop_to_wan
++	}
++
++	chain forward_wan {
++		ct status dnat accept comment "!fw4: Accept port forwards"
++		jump drop_to_wan
++		limit name "wan.log_limit" log prefix "drop wan forward: "
++	}
++
++	chain accept_to_wan {
++		meta nfproto ipv4 oifname "pppoe-wan" ct state invalid limit name "wan.log_limit" log prefix "drop wan invalid ct state: "
++		meta nfproto ipv4 oifname "pppoe-wan" ct state invalid counter drop comment "!fw4: Prevent NAT leakage"
++		meta nfproto ipv4 oifname "pppoe-wan" counter accept comment "!fw4: accept wan IPv4 traffic"
++	}
++
++	chain drop_from_wan {
++		meta nfproto ipv4 iifname "pppoe-wan" limit name "wan.log_limit" log prefix "drop wan in: "
++		meta nfproto ipv4 iifname "pppoe-wan" counter drop comment "!fw4: drop wan IPv4 traffic"
++	}
++
++	chain drop_to_wan {
++		meta nfproto ipv4 oifname "pppoe-wan" limit name "wan.log_limit" log prefix "drop wan out: "
++		meta nfproto ipv4 oifname "pppoe-wan" counter drop comment "!fw4: drop wan IPv4 traffic"
++	}
++
++	chain input_guest {
++		jump drop_from_guest
++	}
++
++	chain output_guest {
++		meta l4proto { "icmp", "ipv6-icmp" } counter jump drop_to_guest comment "!fw4: Deny guest with no log"
++		meta l4proto { "icmp", "ipv6-icmp" } limit name "guest.log_limit" log prefix "Deny guest with log: "
++		meta l4proto { "icmp", "ipv6-icmp" } counter jump drop_to_guest comment "!fw4: Deny guest with log"
++		jump drop_to_guest
++	}
++
++	chain forward_guest {
++		jump drop_to_guest
++	}
++
++	chain drop_from_guest {
++		iifname "br-guest" counter drop comment "!fw4: drop guest IPv4/IPv6 traffic"
++	}
++
++	chain drop_to_guest {
++		oifname "br-guest" counter drop comment "!fw4: drop guest IPv4/IPv6 traffic"
++	}
++
++	chain input_wan6 {
++		jump drop_from_wan6
++	}
++
++	chain output_wan6 {
++		jump drop_to_wan6
++	}
++
++	chain forward_wan6 {
++		jump drop_to_wan6
++		log prefix "drop wan6 forward: "
++	}
++
++	chain drop_from_wan6 {
++		meta nfproto ipv6 iifname "pppoe-wan" counter log prefix "drop wan6 in: " drop comment "!fw4: drop wan6 IPv6 traffic"
++	}
++
++	chain drop_to_wan6 {
++		meta nfproto ipv6 oifname "pppoe-wan" counter log prefix "drop wan6 out: " drop comment "!fw4: drop wan6 IPv6 traffic"
++	}
++
++
++	#
++	# NAT rules
++	#
++
++	chain dstnat {
++		type nat hook prerouting priority dstnat; policy accept;
++		iifname "br-lan" jump dstnat_lan comment "!fw4: Handle lan IPv4/IPv6 dstnat traffic"
++		meta nfproto ipv4 iifname "pppoe-wan" jump dstnat_wan comment "!fw4: Handle wan IPv4 dstnat traffic"
++	}
++
++	chain srcnat {
++		type nat hook postrouting priority srcnat; policy accept;
++		oifname "br-lan" jump srcnat_lan comment "!fw4: Handle lan IPv4/IPv6 srcnat traffic"
++		meta nfproto ipv4 oifname "pppoe-wan" jump srcnat_wan comment "!fw4: Handle wan IPv4 srcnat traffic"
++	}
++
++	chain dstnat_lan {
++		ip saddr { 10.0.0.0/24, 192.168.26.0/24 } ip daddr 10.11.12.194 dnat 10.0.0.2:22 comment "!fw4: @redirect[0] (reflection)"
++		ip saddr { 10.0.0.0/24, 192.168.26.0/24 } ip daddr 10.11.12.194 dnat 10.0.0.2:23 comment "!fw4: @redirect[1] (reflection)"
++	}
++
++	chain srcnat_lan {
++		ip saddr { 10.0.0.0/24, 192.168.26.0/24 } ip daddr 10.0.0.2 tcp dport 22 snat 10.0.0.1 comment "!fw4: @redirect[0] (reflection)"
++		ip saddr { 10.0.0.0/24, 192.168.26.0/24 } ip daddr 10.0.0.2 tcp dport 23 snat 10.0.0.1 comment "!fw4: @redirect[1] (reflection)"
++	}
++
++	chain dstnat_wan {
++		meta nfproto ipv4 limit name "wan.log_limit" log prefix "@redirect[0]: "
++		meta nfproto ipv4 counter dnat 10.0.0.2:22 comment "!fw4: @redirect[0]"
++		meta nfproto ipv4 limit rate 4/minute log prefix "@redirect[1]: "
++		meta nfproto ipv4 counter dnat 10.0.0.2:23 comment "!fw4: @redirect[1]"
++	}
++
++	chain srcnat_wan {
++		meta nfproto ipv4 masquerade comment "!fw4: Masquerade IPv4 wan traffic"
++	}
++
++
++	#
++	# Raw rules (notrack)
++	#
++
++	chain raw_prerouting {
++		type filter hook prerouting priority raw; policy accept;
++	}
++
++	chain raw_output {
++		type filter hook output priority raw; policy accept;
++	}
++
++
++	#
++	# Mangle rules
++	#
++
++	chain mangle_prerouting {
++		type filter hook prerouting priority mangle; policy accept;
++	}
++
++	chain mangle_postrouting {
++		type filter hook postrouting priority mangle; policy accept;
++	}
++
++	chain mangle_input {
++		type filter hook input priority mangle; policy accept;
++	}
++
++	chain mangle_output {
++		type route hook output priority mangle; policy accept;
++	}
++
++	chain mangle_forward {
++		type filter hook forward priority mangle; policy accept;
++	}
++}
++-- End --
+-- 
+2.42.1
+
