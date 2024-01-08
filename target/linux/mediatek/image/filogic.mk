@@ -352,18 +352,46 @@ define Device/glinet_gl-mt3000
 endef
 TARGET_DEVICES += glinet_gl-mt3000
 
+define Device/glinet_packages
+  # usb storage support
+  DEVICE_PACKAGES += kmod-usb-storage kmod-usb-storage-uas kmod-fs-ext4 block-mount
+  # netfilter nathelper
+  DEVICE_PACKAGES += kmod-nf-nathelper kmod-nf-nathelper-extra
+  # net tools
+  DEVICE_PACKAGES += iperf3 tcpdump openssh-sftp-server pppoe-discovery
+  # sys utils
+  DEVICE_PACKAGES += nano mmc-utils mc shadow-utils shadow-useradd shadow-userdel shadow-usermod
+  # timezones
+  DEVICE_PACKAGES += zoneinfo-asia zoneinfo-europe
+  # services
+  DEVICE_PACKAGES += -dnsmasq dnsmasq-full stubby
+  # luci theme
+  DEVICE_PACKAGES += luci-theme-material
+  # luci proto
+  DEVICE_PACKAGES += luci-proto-wireguard
+  # luci applications
+  DEVICE_PACKAGES += luci-app-acme luci-i18n-acme-ru acme-acmesh-dnsapi
+  DEVICE_PACKAGES += luci-app-ddns luci-i18n-ddns-ru
+  DEVICE_PACKAGES += luci-app-hd-idle luci-i18n-hd-idle-ru
+  DEVICE_PACKAGES += luci-app-ksmbd luci-i18n-ksmbd-ru
+  DEVICE_PACKAGES += luci-app-minidlna luci-i18n-minidlna-ru
+  DEVICE_PACKAGES += luci-app-usteer
+  DEVICE_PACKAGES += luci-app-pbr luci-i18n-pbr-ru
+endef
+
 define Device/glinet_gl-mt6000
   DEVICE_VENDOR := GL.iNet
   DEVICE_MODEL := GL-MT6000
   DEVICE_DTS := mt7986a-glinet-gl-mt6000
   DEVICE_DTS_DIR := ../dts
   DEVICE_PACKAGES := e2fsprogs f2fsck mkf2fs kmod-usb3 kmod-mt7986-firmware mt7986-wo-firmware
-  IMAGES += factory.bin
-  IMAGE/factory.bin := append-kernel | pad-to 32M | append-rootfs
+  $(Device/glinet_packages)
+#  IMAGES += factory.bin
+#  IMAGE/factory.bin := append-kernel | pad-to 32M | append-rootfs
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-gl-metadata
-  ARTIFACTS := preloader.bin bl31-uboot.fip
-  ARTIFACT/preloader.bin := mt7986-bl2 emmc-ddr4
-  ARTIFACT/bl31-uboot.fip := mt7986-bl31-uboot glinet_gl-mt6000
+#  ARTIFACTS := preloader.bin bl31-uboot.fip
+#  ARTIFACT/preloader.bin := mt7986-bl2 emmc-ddr4
+#  ARTIFACT/bl31-uboot.fip := mt7986-bl31-uboot glinet_gl-mt6000
 endef
 TARGET_DEVICES += glinet_gl-mt6000
 
