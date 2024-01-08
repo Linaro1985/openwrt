@@ -1,0 +1,36 @@
+From f155774103a61bdab92d5ad74fb02f69a5d50d10 Mon Sep 17 00:00:00 2001
+From: Jo-Philipp Wich <jo@mein.io>
+Date: Tue, 21 May 2024 08:54:02 +0200
+Subject: [PATCH 10/11] fw4: substitute double quotes in strings
+
+The nftables parser has no concept of escape characters in quoted strings,
+nor does it support alternative quoting styles so it is currently
+impossible to emit double quoted strings containing double quotes.
+
+This could cause nftables to choke on generated rulesets that contain
+strings with embedded quotes, e.g. within firewall rule comments.
+
+Since firewall3 (iptables based) historically allowed arbitrary characters
+in comments and since we want to stay backwards compatible with existing
+uci configurations we can not restrict the allowed input values either.
+
+Work around the issue by substituting all double quotes with single quotes
+when quoting strings for interpolation into the ruleset.
+
+Fixes: https://github.com/openwrt/luci/issues/7091
+Signed-off-by: Jo-Philipp Wich <jo@mein.io>
+---
+ root/usr/share/ucode/fw4.uc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/root/usr/share/ucode/fw4.uc
++++ b/root/usr/share/ucode/fw4.uc
+@@ -1643,7 +1643,7 @@ return {
+ 
+ 	quote: function(s, force) {
+ 		if (force === true || !match(s, /^([0-9A-Fa-f:.\/-]+)( \. [0-9A-Fa-f:.\/-]+)*$/))
+-			return `"${replace(s + "", /(["\\])/g, '\\$1')}"`;
++			return `"${replace(s, '"', "'")}"`;
+ 
+ 		return s;
+ 	},
