@@ -1,0 +1,166 @@
+From cfa7e90a0d9c07709b9b9c476dae020e43b76e7c Mon Sep 17 00:00:00 2001
+From: Luiz Angelo Daros de Luca <luizluca@gmail.com>
+Date: Mon, 31 Jul 2023 18:24:11 -0300
+Subject: [PATCH 02/10] fw4: pass zone to templates whenever possible
+
+For those cases where the rule, redirect or .... are related to
+a zone, pass it to the template.
+
+Signed-off-by: Luiz Angelo Daros de Luca <luizluca@gmail.com>
+[whitespace cleanup]
+Signed-off-by: Jo-Philipp Wich <jo@mein.io>
+---
+ root/usr/share/firewall4/templates/ruleset.uc | 32 +++++++++----------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
+
+diff --git a/root/usr/share/firewall4/templates/ruleset.uc b/root/usr/share/firewall4/templates/ruleset.uc
+index 7bd9309..b810a95 100644
+--- a/root/usr/share/firewall4/templates/ruleset.uc
++++ b/root/usr/share/firewall4/templates/ruleset.uc
+@@ -108,7 +108,7 @@ table inet fw4 {
+ 		tcp flags & (fin | syn | rst | ack) == syn jump syn_flood comment "!fw4: Rate limit TCP syn packets"
+ {% endif %}
+ {% for (let rule in fw4.rules("input")): %}
+-		{%+ include("rule.uc", { fw4, rule }) %}
++		{%+ include("rule.uc", { fw4, zone: null, rule }) %}
+ {% endfor %}
+ {% for (let zone in fw4.zones()): for (let rule in zone.match_rules): %}
+ 		{%+ include("zone-jump.uc", { fw4, zone, rule, direction: "input" }) %}
+@@ -131,7 +131,7 @@ table inet fw4 {
+ 		ct state invalid drop comment "!fw4: Drop flows with invalid conntrack state"
+ {% endif %}
+ {% for (let rule in fw4.rules("forward")): %}
+-		{%+ include("rule.uc", { fw4, rule }) %}
++		{%+ include("rule.uc", { fw4, zone: null, rule }) %}
+ {% endfor %}
+ {% for (let zone in fw4.zones()): for (let rule in zone.match_rules): %}
+ 		{%+ include("zone-jump.uc", { fw4, zone, rule, direction: "forward" }) %}
+@@ -153,7 +153,7 @@ table inet fw4 {
+ 		ct state invalid drop comment "!fw4: Drop flows with invalid conntrack state"
+ {% endif %}
+ {% for (let rule in fw4.rules("output")): %}
+-		{%+ include("rule.uc", { fw4, rule }) %}
++		{%+ include("rule.uc", { fw4, zone: null, rule }) %}
+ {% endfor %}
+ {% for (let zone in fw4.zones()): %}
+ {%  for (let rule in zone.match_rules): %}
+@@ -216,7 +216,7 @@ table inet fw4 {
+ 	chain input_{{ zone.name }} {
+ {%  fw4.includes('chain-prepend', `input_${zone.name}`) %}
+ {%  for (let rule in fw4.rules(`input_${zone.name}`)): %}
+-		{%+ include("rule.uc", { fw4, rule }) %}
++		{%+ include("rule.uc", { fw4, zone, rule }) %}
+ {%  endfor %}
+ {%  if (zone.dflags.dnat): %}
+ 		ct status dnat accept comment "!fw4: Accept port redirections"
+@@ -228,7 +228,7 @@ table inet fw4 {
+ 	chain output_{{ zone.name }} {
+ {%  fw4.includes('chain-prepend', `output_${zone.name}`) %}
+ {%  for (let rule in fw4.rules(`output_${zone.name}`)): %}
+-		{%+ include("rule.uc", { fw4, rule }) %}
++		{%+ include("rule.uc", { fw4, zone, rule }) %}
+ {%  endfor %}
+ {%  fw4.includes('chain-append', `output_${zone.name}`) %}
+ 		jump {{ zone.output }}_to_{{ zone.name }}
+@@ -237,7 +237,7 @@ table inet fw4 {
+ 	chain forward_{{ zone.name }} {
+ {%  fw4.includes('chain-prepend', `forward_${zone.name}`) %}
+ {%  for (let rule in fw4.rules(`forward_${zone.name}`)): %}
+-		{%+ include("rule.uc", { fw4, rule }) %}
++		{%+ include("rule.uc", { fw4, zone, rule }) %}
+ {%  endfor %}
+ {%  if (zone.dflags.dnat): %}
+ 		ct status dnat accept comment "!fw4: Accept port forwards"
+@@ -252,7 +252,7 @@ table inet fw4 {
+ {%  if (zone.dflags.helper): %}
+ 	chain helper_{{ zone.name }} {
+ {%   for (let rule in fw4.rules(`helper_${zone.name}`)): %}
+-		{%+ include("rule.uc", { fw4, rule }) %}
++		{%+ include("rule.uc", { fw4, zone, rule }) %}
+ {%   endfor %}
+ 	}
+ 
+@@ -301,7 +301,7 @@ table inet fw4 {
+ 		type nat hook postrouting priority srcnat; policy accept;
+ {% fw4.includes('chain-prepend', 'srcnat') %}
+ {% for (let redirect in fw4.redirects("srcnat")): %}
+-		{%+ include("redirect.uc", { fw4, redirect }) %}
++		{%+ include("redirect.uc", { fw4, zone: null, redirect }) %}
+ {% endfor %}
+ {% for (let zone in fw4.zones()): %}
+ {%  if (zone.dflags.snat): %}
+@@ -318,7 +318,7 @@ table inet fw4 {
+ 	chain dstnat_{{ zone.name }} {
+ {%   fw4.includes('chain-prepend', `dstnat_${zone.name}`) %}
+ {%   for (let redirect in fw4.redirects(`dstnat_${zone.name}`)): %}
+-		{%+ include("redirect.uc", { fw4, redirect }) %}
++		{%+ include("redirect.uc", { fw4, zone, redirect }) %}
+ {%   endfor %}
+ {%   fw4.includes('chain-append', `dstnat_${zone.name}`) %}
+ 	}
+@@ -328,7 +328,7 @@ table inet fw4 {
+ 	chain srcnat_{{ zone.name }} {
+ {%   fw4.includes('chain-prepend', `srcnat_${zone.name}`) %}
+ {%   for (let redirect in fw4.redirects(`srcnat_${zone.name}`)): %}
+-		{%+ include("redirect.uc", { fw4, redirect }) %}
++		{%+ include("redirect.uc", { fw4, zone, redirect }) %}
+ {%   endfor %}
+ {%   if (zone.masq): %}
+ {%    for (let saddrs in zone.masq4_src_subnets): %}
+@@ -391,7 +391,7 @@ table inet fw4 {
+ {%   if (zone.dflags.notrack): %}
+ 	chain notrack_{{ zone.name }} {
+ {% for (let rule in fw4.rules(`notrack_${zone.name}`)): %}
+-		{%+ include("rule.uc", { fw4, rule }) %}
++		{%+ include("rule.uc", { fw4, zone, rule }) %}
+ {% endfor %}
+ 	}
+ 
+@@ -406,7 +406,7 @@ table inet fw4 {
+ 		type filter hook prerouting priority mangle; policy accept;
+ {% fw4.includes('chain-prepend', 'mangle_prerouting') %}
+ {% for (let rule in fw4.rules("mangle_prerouting")): %}
+-		{%+ include("rule.uc", { fw4, rule }) %}
++		{%+ include("rule.uc", { fw4, zone: null, rule }) %}
+ {% endfor %}
+ {% fw4.includes('chain-append', 'mangle_prerouting') %}
+ 	}
+@@ -415,7 +415,7 @@ table inet fw4 {
+ 		type filter hook postrouting priority mangle; policy accept;
+ {% fw4.includes('chain-prepend', 'mangle_postrouting') %}
+ {% for (let rule in fw4.rules("mangle_postrouting")): %}
+-		{%+ include("rule.uc", { fw4, rule }) %}
++		{%+ include("rule.uc", { fw4, zone: null, rule }) %}
+ {% endfor %}
+ {% fw4.includes('chain-append', 'mangle_postrouting') %}
+ 	}
+@@ -424,7 +424,7 @@ table inet fw4 {
+ 		type filter hook input priority mangle; policy accept;
+ {% fw4.includes('chain-prepend', 'mangle_input') %}
+ {% for (let rule in fw4.rules("mangle_input")): %}
+-		{%+ include("rule.uc", { fw4, rule }) %}
++		{%+ include("rule.uc", { fw4, zone: null, rule }) %}
+ {% endfor %}
+ {% fw4.includes('chain-append', 'mangle_input') %}
+ 	}
+@@ -433,7 +433,7 @@ table inet fw4 {
+ 		type route hook output priority mangle; policy accept;
+ {% fw4.includes('chain-prepend', 'mangle_output') %}
+ {% for (let rule in fw4.rules("mangle_output")): %}
+-		{%+ include("rule.uc", { fw4, rule }) %}
++		{%+ include("rule.uc", { fw4, zone: null, rule }) %}
+ {% endfor %}
+ {% fw4.includes('chain-append', 'mangle_output') %}
+ 	}
+@@ -442,7 +442,7 @@ table inet fw4 {
+ 		type filter hook forward priority mangle; policy accept;
+ {% fw4.includes('chain-prepend', 'mangle_forward') %}
+ {% for (let rule in fw4.rules("mangle_forward")): %}
+-		{%+ include("rule.uc", { fw4, rule }) %}
++		{%+ include("rule.uc", { fw4, zone: null, rule }) %}
+ {% endfor %}
+ {% for (let zone in fw4.zones()): %}
+ {%  if (zone.mtu_fix): %}
+-- 
+2.42.1
+

@@ -1,0 +1,997 @@
+From 6c955bd79c77a3ad96e40fb415d9ba3e852b80bd Mon Sep 17 00:00:00 2001
+From: Andris PE <neandris@gmail.com>
+Date: Thu, 7 Sep 2023 22:04:35 +0300
+Subject: [PATCH 05/10] ruleset: dispatch ct states using verdict map
+
+In case the dropping of invalid conntrack states is enabled, using a verdict
+map allows us to use only one rule instead of two, lowering the initial rule
+match overhead.
+
+Signed-off-by: Andris PE <neandris@gmail.com>
+[whitespace cleanup, rebase, extend commit subject and message]
+Signed-off-by: Jo-Philipp Wich <jo@mein.io>
+---
+ root/usr/share/firewall4/templates/ruleset.uc | 15 +++------------
+ tests/01_configuration/01_ruleset             |  6 +++---
+ tests/01_configuration/02_rule_order          |  6 +++---
+ tests/02_zones/01_policies                    |  6 +++---
+ tests/02_zones/02_masq                        |  6 +++---
+ tests/02_zones/03_masq_src_dest_restrictions  |  6 +++---
+ tests/02_zones/04_masq_allow_invalid          |  6 +++---
+ tests/02_zones/04_wildcard_devices            |  6 +++---
+ tests/02_zones/05_subnet_mask_matches         |  6 +++---
+ tests/02_zones/06_family_selections           |  6 +++---
+ tests/02_zones/07_helpers                     |  6 +++---
+ tests/02_zones/08_log_limit                   |  6 +++---
+ tests/03_rules/01_direction                   |  6 +++---
+ tests/03_rules/02_enabled                     |  6 +++---
+ tests/03_rules/03_constraints                 |  6 +++---
+ tests/03_rules/04_icmp                        |  6 +++---
+ tests/03_rules/05_mangle                      |  6 +++---
+ tests/03_rules/06_subnet_mask_matches         |  6 +++---
+ tests/03_rules/07_redirect                    |  6 +++---
+ tests/03_rules/08_family_inheritance          |  6 +++---
+ tests/03_rules/09_time                        |  6 +++---
+ tests/03_rules/10_notrack                     |  6 +++---
+ tests/03_rules/11_log                         |  6 +++---
+ tests/03_rules/12_mark                        |  6 +++---
+ tests/04_forwardings/01_family_selections     |  6 +++---
+ tests/05_ipsets/01_declaration                |  6 +++---
+ tests/05_ipsets/02_usage                      |  6 +++---
+ tests/06_includes/01_nft_includes             |  6 +++---
+ tests/06_includes/02_firewall.user_include    |  6 +++---
+ tests/06_includes/04_disabled_include         |  6 +++---
+ tests/06_includes/05_automatic_includes       |  6 +++---
+ 31 files changed, 93 insertions(+), 102 deletions(-)
+
+diff --git a/root/usr/share/firewall4/templates/ruleset.uc b/root/usr/share/firewall4/templates/ruleset.uc
+index 219cd02..f7c93fc 100644
+--- a/root/usr/share/firewall4/templates/ruleset.uc
++++ b/root/usr/share/firewall4/templates/ruleset.uc
+@@ -115,10 +115,7 @@ table inet fw4 {
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+ {% fw4.includes('chain-prepend', 'input') %}
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
+-{% if (fw4.default_option("drop_invalid")): %}
+-		ct state invalid drop comment "!fw4: Drop flows with invalid conntrack state"
+-{% endif %}
++		ct state vmap { established : accept, related : accept{% if (fw4.default_option("drop_invalid")): %}, invalid : drop{% endif %} } comment "!fw4: Handle inbound flows"
+ {% if (fw4.default_option("synflood_protect") && fw4.default_option("synflood_rate")): %}
+ 		tcp flags & (fin | syn | rst | ack) == syn jump syn_flood comment "!fw4: Rate limit TCP syn packets"
+ {% endif %}
+@@ -141,10 +138,7 @@ table inet fw4 {
+ 		meta l4proto { tcp, udp } flow offload @ft;
+ {% endif %}
+ {% fw4.includes('chain-prepend', 'forward') %}
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
+-{% if (fw4.default_option("drop_invalid")): %}
+-		ct state invalid drop comment "!fw4: Drop flows with invalid conntrack state"
+-{% endif %}
++		ct state vmap { established : accept, related : accept{% if (fw4.default_option("drop_invalid")): %}, invalid : drop{% endif %} } comment "!fw4: Handle forwarded flows"
+ {% for (let rule in fw4.rules("forward")): %}
+ 		{%+ include("rule.uc", { fw4, zone: (rule.src?.zone?.log_limit ? rule.src.zone : rule.dest?.zone), rule }) %}
+ {% endfor %}
+@@ -163,10 +157,7 @@ table inet fw4 {
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+ {% fw4.includes('chain-prepend', 'output') %}
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
+-{% if (fw4.default_option("drop_invalid")): %}
+-		ct state invalid drop comment "!fw4: Drop flows with invalid conntrack state"
+-{% endif %}
++		ct state vmap { established : accept, related : accept{% if (fw4.default_option("drop_invalid")): %}, invalid : drop{% endif %} } comment "!fw4: Handle outbound flows"
+ {% for (let rule in fw4.rules("output")): %}
+ 		{%+ include("rule.uc", { fw4, zone: null, rule }) %}
+ {% endfor %}
+diff --git a/tests/01_configuration/01_ruleset b/tests/01_configuration/01_ruleset
+index 2a0e5df..6a30d22 100644
+--- a/tests/01_configuration/01_ruleset
++++ b/tests/01_configuration/01_ruleset
+@@ -112,7 +112,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		tcp flags & (fin | syn | rst | ack) == syn jump syn_flood comment "!fw4: Rate limit TCP syn packets"
+ 		iifname "br-lan" jump input_lan comment "!fw4: Handle lan IPv4/IPv6 input traffic"
+ 		iifname "pppoe-wan" jump input_wan comment "!fw4: Handle wan IPv4/IPv6 input traffic"
+@@ -123,7 +123,7 @@ table inet fw4 {
+ 		type filter hook forward priority filter; policy drop;
+ 
+ 		meta l4proto { tcp, udp } flow offload @ft;
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname "br-lan" jump forward_lan comment "!fw4: Handle lan IPv4/IPv6 forward traffic"
+ 		iifname "pppoe-wan" jump forward_wan comment "!fw4: Handle wan IPv4/IPv6 forward traffic"
+ 		jump handle_reject
+@@ -134,7 +134,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		meta l4proto tcp counter comment "!fw4: Test-Deprecated-Rule-Option"
+ 		oifname "br-lan" jump output_lan comment "!fw4: Handle lan IPv4/IPv6 output traffic"
+ 		oifname "pppoe-wan" jump output_wan comment "!fw4: Handle wan IPv4/IPv6 output traffic"
+diff --git a/tests/01_configuration/02_rule_order b/tests/01_configuration/02_rule_order
+index 93a0f08..7b62d68 100644
+--- a/tests/01_configuration/02_rule_order
++++ b/tests/01_configuration/02_rule_order
+@@ -93,7 +93,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		iifname "br-lan" jump input_lan comment "!fw4: Handle lan IPv4/IPv6 input traffic"
+ 		iifname "pppoe-wan" jump input_wan comment "!fw4: Handle wan IPv4/IPv6 input traffic"
+ 	}
+@@ -101,7 +101,7 @@ table inet fw4 {
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname "br-lan" jump forward_lan comment "!fw4: Handle lan IPv4/IPv6 forward traffic"
+ 		iifname "pppoe-wan" jump forward_wan comment "!fw4: Handle wan IPv4/IPv6 forward traffic"
+ 	}
+@@ -111,7 +111,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname "br-lan" jump output_lan comment "!fw4: Handle lan IPv4/IPv6 output traffic"
+ 		oifname "pppoe-wan" jump output_wan comment "!fw4: Handle wan IPv4/IPv6 output traffic"
+ 	}
+diff --git a/tests/02_zones/01_policies b/tests/02_zones/01_policies
+index 03be7af..572086e 100644
+--- a/tests/02_zones/01_policies
++++ b/tests/02_zones/01_policies
+@@ -95,7 +95,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		iifname "zone1" jump input_test1 comment "!fw4: Handle test1 IPv4/IPv6 input traffic"
+ 		iifname "zone2" jump input_test2 comment "!fw4: Handle test2 IPv4/IPv6 input traffic"
+ 		iifname "zone3" jump input_test3 comment "!fw4: Handle test3 IPv4/IPv6 input traffic"
+@@ -104,7 +104,7 @@ table inet fw4 {
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname "zone1" jump forward_test1 comment "!fw4: Handle test1 IPv4/IPv6 forward traffic"
+ 		iifname "zone2" jump forward_test2 comment "!fw4: Handle test2 IPv4/IPv6 forward traffic"
+ 		iifname "zone3" jump forward_test3 comment "!fw4: Handle test3 IPv4/IPv6 forward traffic"
+@@ -115,7 +115,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname "zone1" jump output_test1 comment "!fw4: Handle test1 IPv4/IPv6 output traffic"
+ 		oifname "zone2" jump output_test2 comment "!fw4: Handle test2 IPv4/IPv6 output traffic"
+ 		oifname "zone3" jump output_test3 comment "!fw4: Handle test3 IPv4/IPv6 output traffic"
+diff --git a/tests/02_zones/02_masq b/tests/02_zones/02_masq
+index 1b1098f..35d3cbc 100644
+--- a/tests/02_zones/02_masq
++++ b/tests/02_zones/02_masq
+@@ -99,7 +99,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		iifname "zone1" jump input_test1 comment "!fw4: Handle test1 IPv4/IPv6 input traffic"
+ 		iifname "zone2" jump input_test2 comment "!fw4: Handle test2 IPv4/IPv6 input traffic"
+ 		iifname "zone3" jump input_test3 comment "!fw4: Handle test3 IPv4/IPv6 input traffic"
+@@ -108,7 +108,7 @@ table inet fw4 {
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname "zone1" jump forward_test1 comment "!fw4: Handle test1 IPv4/IPv6 forward traffic"
+ 		iifname "zone2" jump forward_test2 comment "!fw4: Handle test2 IPv4/IPv6 forward traffic"
+ 		iifname "zone3" jump forward_test3 comment "!fw4: Handle test3 IPv4/IPv6 forward traffic"
+@@ -119,7 +119,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname "zone1" jump output_test1 comment "!fw4: Handle test1 IPv4/IPv6 output traffic"
+ 		oifname "zone2" jump output_test2 comment "!fw4: Handle test2 IPv4/IPv6 output traffic"
+ 		oifname "zone3" jump output_test3 comment "!fw4: Handle test3 IPv4/IPv6 output traffic"
+diff --git a/tests/02_zones/03_masq_src_dest_restrictions b/tests/02_zones/03_masq_src_dest_restrictions
+index 011ef89..51e05db 100644
+--- a/tests/02_zones/03_masq_src_dest_restrictions
++++ b/tests/02_zones/03_masq_src_dest_restrictions
+@@ -122,7 +122,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		iifname "zone1" jump input_test1 comment "!fw4: Handle test1 IPv4/IPv6 input traffic"
+ 		iifname "zone2" jump input_test2 comment "!fw4: Handle test2 IPv4/IPv6 input traffic"
+ 	}
+@@ -130,7 +130,7 @@ table inet fw4 {
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname "zone1" jump forward_test1 comment "!fw4: Handle test1 IPv4/IPv6 forward traffic"
+ 		iifname "zone2" jump forward_test2 comment "!fw4: Handle test2 IPv4/IPv6 forward traffic"
+ 	}
+@@ -140,7 +140,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname "zone1" jump output_test1 comment "!fw4: Handle test1 IPv4/IPv6 output traffic"
+ 		oifname "zone2" jump output_test2 comment "!fw4: Handle test2 IPv4/IPv6 output traffic"
+ 	}
+diff --git a/tests/02_zones/04_masq_allow_invalid b/tests/02_zones/04_masq_allow_invalid
+index 5a404b9..bdda791 100644
+--- a/tests/02_zones/04_masq_allow_invalid
++++ b/tests/02_zones/04_masq_allow_invalid
+@@ -71,14 +71,14 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		iifname "zone1" jump input_test1 comment "!fw4: Handle test1 IPv4/IPv6 input traffic"
+ 	}
+ 
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname "zone1" jump forward_test1 comment "!fw4: Handle test1 IPv4/IPv6 forward traffic"
+ 	}
+ 
+@@ -87,7 +87,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname "zone1" jump output_test1 comment "!fw4: Handle test1 IPv4/IPv6 output traffic"
+ 	}
+ 
+diff --git a/tests/02_zones/04_wildcard_devices b/tests/02_zones/04_wildcard_devices
+index 292fd11..22c2183 100644
+--- a/tests/02_zones/04_wildcard_devices
++++ b/tests/02_zones/04_wildcard_devices
+@@ -122,7 +122,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		jump input_test1 comment "!fw4: Handle test1 IPv4/IPv6 input traffic"
+ 		iifname "/never/" jump input_test2 comment "!fw4: Handle test2 IPv4/IPv6 input traffic"
+ 		iifname "test*" jump input_test3 comment "!fw4: Handle test3 IPv4/IPv6 input traffic"
+@@ -137,7 +137,7 @@ table inet fw4 {
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		jump forward_test1 comment "!fw4: Handle test1 IPv4/IPv6 forward traffic"
+ 		iifname "/never/" jump forward_test2 comment "!fw4: Handle test2 IPv4/IPv6 forward traffic"
+ 		iifname "test*" jump forward_test3 comment "!fw4: Handle test3 IPv4/IPv6 forward traffic"
+@@ -154,7 +154,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		jump output_test1 comment "!fw4: Handle test1 IPv4/IPv6 output traffic"
+ 		oifname "/never/" jump output_test2 comment "!fw4: Handle test2 IPv4/IPv6 output traffic"
+ 		oifname "test*" jump output_test3 comment "!fw4: Handle test3 IPv4/IPv6 output traffic"
+diff --git a/tests/02_zones/05_subnet_mask_matches b/tests/02_zones/05_subnet_mask_matches
+index c171ac7..a66ad73 100644
+--- a/tests/02_zones/05_subnet_mask_matches
++++ b/tests/02_zones/05_subnet_mask_matches
+@@ -81,7 +81,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		meta nfproto ipv6 ip6 saddr & ::ffff == ::1 ip6 saddr & ::ffff != ::2 jump input_test1 comment "!fw4: Handle test1 IPv6 input traffic"
+ 		meta nfproto ipv6 ip6 saddr != { ::7, ::8 } ip6 saddr & ::ffff == ::1 ip6 saddr & ::ffff != ::5 ip6 saddr & ::ffff != ::6 jump input_test2 comment "!fw4: Handle test2 IPv6 input traffic"
+ 		meta nfproto ipv6 ip6 saddr != { ::7, ::8 } ip6 saddr & ::ffff == ::2 ip6 saddr & ::ffff != ::5 ip6 saddr & ::ffff != ::6 jump input_test2 comment "!fw4: Handle test2 IPv6 input traffic"
+@@ -91,7 +91,7 @@ table inet fw4 {
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		meta nfproto ipv6 ip6 saddr & ::ffff == ::1 ip6 saddr & ::ffff != ::2 jump forward_test1 comment "!fw4: Handle test1 IPv6 forward traffic"
+ 		meta nfproto ipv6 ip6 saddr != { ::7, ::8 } ip6 saddr & ::ffff == ::1 ip6 saddr & ::ffff != ::5 ip6 saddr & ::ffff != ::6 jump forward_test2 comment "!fw4: Handle test2 IPv6 forward traffic"
+ 		meta nfproto ipv6 ip6 saddr != { ::7, ::8 } ip6 saddr & ::ffff == ::2 ip6 saddr & ::ffff != ::5 ip6 saddr & ::ffff != ::6 jump forward_test2 comment "!fw4: Handle test2 IPv6 forward traffic"
+@@ -103,7 +103,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		meta nfproto ipv6 ip6 daddr & ::ffff == ::1 ip6 daddr & ::ffff != ::2 jump output_test1 comment "!fw4: Handle test1 IPv6 output traffic"
+ 		meta nfproto ipv6 ip6 daddr != { ::7, ::8 } ip6 daddr & ::ffff == ::1 ip6 daddr & ::ffff != ::5 ip6 daddr & ::ffff != ::6 jump output_test2 comment "!fw4: Handle test2 IPv6 output traffic"
+ 		meta nfproto ipv6 ip6 daddr != { ::7, ::8 } ip6 daddr & ::ffff == ::2 ip6 daddr & ::ffff != ::5 ip6 daddr & ::ffff != ::6 jump output_test2 comment "!fw4: Handle test2 IPv6 output traffic"
+diff --git a/tests/02_zones/06_family_selections b/tests/02_zones/06_family_selections
+index b01a609..28a4894 100644
+--- a/tests/02_zones/06_family_selections
++++ b/tests/02_zones/06_family_selections
+@@ -136,7 +136,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		meta nfproto ipv4 ip saddr 10.0.0.0/8 jump input_test1 comment "!fw4: Handle test1 IPv4 input traffic"
+ 		meta nfproto ipv6 ip6 saddr 2001:db8:1234::/64 jump input_test2 comment "!fw4: Handle test2 IPv6 input traffic"
+ 		meta nfproto ipv6 ip6 saddr 2001:db8:1234::/64 jump input_test3 comment "!fw4: Handle test3 IPv6 input traffic"
+@@ -148,7 +148,7 @@ table inet fw4 {
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		meta nfproto ipv4 ip saddr 10.0.0.0/8 jump forward_test1 comment "!fw4: Handle test1 IPv4 forward traffic"
+ 		meta nfproto ipv6 ip6 saddr 2001:db8:1234::/64 jump forward_test2 comment "!fw4: Handle test2 IPv6 forward traffic"
+ 		meta nfproto ipv6 ip6 saddr 2001:db8:1234::/64 jump forward_test3 comment "!fw4: Handle test3 IPv6 forward traffic"
+@@ -162,7 +162,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		meta nfproto ipv4 ip daddr 10.0.0.0/8 jump output_test1 comment "!fw4: Handle test1 IPv4 output traffic"
+ 		meta nfproto ipv6 ip6 daddr 2001:db8:1234::/64 jump output_test2 comment "!fw4: Handle test2 IPv6 output traffic"
+ 		meta nfproto ipv6 ip6 daddr 2001:db8:1234::/64 jump output_test3 comment "!fw4: Handle test3 IPv6 output traffic"
+diff --git a/tests/02_zones/07_helpers b/tests/02_zones/07_helpers
+index 1a5a24a..363aff1 100644
+--- a/tests/02_zones/07_helpers
++++ b/tests/02_zones/07_helpers
+@@ -168,7 +168,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		iifname "zone1" jump input_test1 comment "!fw4: Handle test1 IPv4/IPv6 input traffic"
+ 		iifname "zone2" jump input_test2 comment "!fw4: Handle test2 IPv4/IPv6 input traffic"
+ 		iifname "zone3" jump input_test3 comment "!fw4: Handle test3 IPv4/IPv6 input traffic"
+@@ -178,7 +178,7 @@ table inet fw4 {
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname "zone1" jump forward_test1 comment "!fw4: Handle test1 IPv4/IPv6 forward traffic"
+ 		iifname "zone2" jump forward_test2 comment "!fw4: Handle test2 IPv4/IPv6 forward traffic"
+ 		iifname "zone3" jump forward_test3 comment "!fw4: Handle test3 IPv4/IPv6 forward traffic"
+@@ -190,7 +190,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname "zone1" jump output_test1 comment "!fw4: Handle test1 IPv4/IPv6 output traffic"
+ 		oifname "zone2" jump output_test2 comment "!fw4: Handle test2 IPv4/IPv6 output traffic"
+ 		oifname "zone3" jump output_test3 comment "!fw4: Handle test3 IPv4/IPv6 output traffic"
+diff --git a/tests/02_zones/08_log_limit b/tests/02_zones/08_log_limit
+index 35e5108..b5613bc 100644
+--- a/tests/02_zones/08_log_limit
++++ b/tests/02_zones/08_log_limit
+@@ -240,7 +240,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		tcp dport 1007 counter log prefix "@rule[6]: " comment "!fw4: @rule[6]"
+ 		tcp dport 1008 counter comment "!fw4: @rule[7]"
+ 		tcp dport 1009 limit rate 5/minute log prefix "@rule[12]: "
+@@ -254,7 +254,7 @@ table inet fw4 {
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		tcp dport 1005 limit name "lan.log_limit" log prefix "@rule[4]: "
+ 		tcp dport 1005 counter comment "!fw4: @rule[4]"
+ 		tcp dport 1006 counter comment "!fw4: @rule[5]"
+@@ -269,7 +269,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname "br-lan" jump output_lan comment "!fw4: Handle lan IPv4/IPv6 output traffic"
+ 		meta nfproto ipv4 oifname "pppoe-wan" jump output_wan comment "!fw4: Handle wan IPv4 output traffic"
+ 		oifname "br-guest" jump output_guest comment "!fw4: Handle guest IPv4/IPv6 output traffic"
+diff --git a/tests/03_rules/01_direction b/tests/03_rules/01_direction
+index 7751a23..4a7ba42 100644
+--- a/tests/03_rules/01_direction
++++ b/tests/03_rules/01_direction
+@@ -71,14 +71,14 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		counter comment "!fw4: @rule[1]"
+ 	}
+ 
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		counter comment "!fw4: @rule[3]"
+ 	}
+ 
+@@ -87,7 +87,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		counter comment "!fw4: @rule[0]"
+ 		counter comment "!fw4: @rule[2]"
+ 	}
+diff --git a/tests/03_rules/02_enabled b/tests/03_rules/02_enabled
+index c5ef8c6..ae2f424 100644
+--- a/tests/03_rules/02_enabled
++++ b/tests/03_rules/02_enabled
+@@ -68,13 +68,13 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 	}
+ 
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 	}
+ 
+ 	chain output {
+@@ -82,7 +82,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		counter comment "!fw4: Implicitly enabled"
+ 		counter comment "!fw4: Explicitly enabled"
+ 	}
+diff --git a/tests/03_rules/03_constraints b/tests/03_rules/03_constraints
+index 05fb379..eb3272f 100644
+--- a/tests/03_rules/03_constraints
++++ b/tests/03_rules/03_constraints
+@@ -107,13 +107,13 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 	}
+ 
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 	}
+ 
+ 	chain output {
+@@ -121,7 +121,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		meta nfproto ipv4 ip dscp 0x0 counter comment "!fw4: DSCP match rule #1"
+ 		meta nfproto ipv6 ip6 dscp 0x0 counter comment "!fw4: DSCP match rule #1"
+ 	}
+diff --git a/tests/03_rules/04_icmp b/tests/03_rules/04_icmp
+index c355375..b70d102 100644
+--- a/tests/03_rules/04_icmp
++++ b/tests/03_rules/04_icmp
+@@ -77,13 +77,13 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 	}
+ 
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 	}
+ 
+ 	chain output {
+@@ -91,7 +91,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		meta l4proto { "icmp", "ipv6-icmp" } counter comment "!fw4: ICMP rule #1"
+ 		meta nfproto ipv6 meta l4proto ipv6-icmp counter comment "!fw4: ICMP rule #2"
+ 		meta nfproto ipv6 meta l4proto ipv6-icmp counter comment "!fw4: ICMP rule #3"
+diff --git a/tests/03_rules/05_mangle b/tests/03_rules/05_mangle
+index 57444de..e1d27e3 100644
+--- a/tests/03_rules/05_mangle
++++ b/tests/03_rules/05_mangle
+@@ -178,7 +178,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		iifname { "eth0", "eth1" } jump input_lan comment "!fw4: Handle lan IPv4/IPv6 input traffic"
+ 		iifname { "eth2", "eth3" } jump input_wan comment "!fw4: Handle wan IPv4/IPv6 input traffic"
+ 	}
+@@ -186,7 +186,7 @@ table inet fw4 {
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname { "eth0", "eth1" } jump forward_lan comment "!fw4: Handle lan IPv4/IPv6 forward traffic"
+ 		iifname { "eth2", "eth3" } jump forward_wan comment "!fw4: Handle wan IPv4/IPv6 forward traffic"
+ 	}
+@@ -196,7 +196,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname { "eth0", "eth1" } jump output_lan comment "!fw4: Handle lan IPv4/IPv6 output traffic"
+ 		oifname { "eth2", "eth3" } jump output_wan comment "!fw4: Handle wan IPv4/IPv6 output traffic"
+ 	}
+diff --git a/tests/03_rules/06_subnet_mask_matches b/tests/03_rules/06_subnet_mask_matches
+index 6423398..0bedf50 100644
+--- a/tests/03_rules/06_subnet_mask_matches
++++ b/tests/03_rules/06_subnet_mask_matches
+@@ -133,7 +133,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		iifname "pppoe-wan" jump input_wan comment "!fw4: Handle wan IPv4/IPv6 input traffic"
+ 		iifname "br-lan" jump input_lan comment "!fw4: Handle lan IPv4/IPv6 input traffic"
+ 		iifname "br-guest" jump input_guest comment "!fw4: Handle guest IPv4/IPv6 input traffic"
+@@ -142,7 +142,7 @@ table inet fw4 {
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname "pppoe-wan" jump forward_wan comment "!fw4: Handle wan IPv4/IPv6 forward traffic"
+ 		iifname "br-lan" jump forward_lan comment "!fw4: Handle lan IPv4/IPv6 forward traffic"
+ 		iifname "br-guest" jump forward_guest comment "!fw4: Handle guest IPv4/IPv6 forward traffic"
+@@ -153,7 +153,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		ip6 saddr & ::ffff == ::1 ip6 daddr & ::ffff != ::2 counter comment "!fw4: Mask rule #1"
+ 		ip6 saddr != { ::7, ::8 } ip6 saddr & ::ffff == ::1 ip6 saddr & ::ffff != ::5 ip6 saddr & ::ffff != ::6 ip6 daddr != { ::15, ::16 } ip6 daddr & ::ffff == ::9 ip6 daddr & ::ffff != ::13 ip6 daddr & ::ffff != ::14 counter comment "!fw4: Mask rule #2"
+ 		ip6 saddr != { ::7, ::8 } ip6 saddr & ::ffff == ::1 ip6 saddr & ::ffff != ::5 ip6 saddr & ::ffff != ::6 ip6 daddr != { ::15, ::16 } ip6 daddr & ::ffff == ::10 ip6 daddr & ::ffff != ::13 ip6 daddr & ::ffff != ::14 counter comment "!fw4: Mask rule #2"
+diff --git a/tests/03_rules/07_redirect b/tests/03_rules/07_redirect
+index e6057fd..80a9773 100644
+--- a/tests/03_rules/07_redirect
++++ b/tests/03_rules/07_redirect
+@@ -165,7 +165,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		iifname "pppoe-wan" jump input_wan comment "!fw4: Handle wan IPv4/IPv6 input traffic"
+ 		iifname "br-lan" jump input_lan comment "!fw4: Handle lan IPv4/IPv6 input traffic"
+ 		iifname "wwan0" jump input_noaddr comment "!fw4: Handle noaddr IPv4/IPv6 input traffic"
+@@ -174,7 +174,7 @@ table inet fw4 {
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname "pppoe-wan" jump forward_wan comment "!fw4: Handle wan IPv4/IPv6 forward traffic"
+ 		iifname "br-lan" jump forward_lan comment "!fw4: Handle lan IPv4/IPv6 forward traffic"
+ 		iifname "wwan0" jump forward_noaddr comment "!fw4: Handle noaddr IPv4/IPv6 forward traffic"
+@@ -185,7 +185,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname "pppoe-wan" jump output_wan comment "!fw4: Handle wan IPv4/IPv6 output traffic"
+ 		oifname "br-lan" jump output_lan comment "!fw4: Handle lan IPv4/IPv6 output traffic"
+ 		oifname "wwan0" jump output_noaddr comment "!fw4: Handle noaddr IPv4/IPv6 output traffic"
+diff --git a/tests/03_rules/08_family_inheritance b/tests/03_rules/08_family_inheritance
+index fa02ead..b275ca6 100644
+--- a/tests/03_rules/08_family_inheritance
++++ b/tests/03_rules/08_family_inheritance
+@@ -202,14 +202,14 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		meta nfproto ipv4 ip saddr 192.168.1.0/24 jump input_ipv4only comment "!fw4: Handle ipv4only IPv4 input traffic"
+ 	}
+ 
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		meta nfproto ipv4 ip saddr 192.168.1.0/24 jump forward_ipv4only comment "!fw4: Handle ipv4only IPv4 forward traffic"
+ 	}
+ 
+@@ -218,7 +218,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		meta nfproto ipv4 ip daddr 192.168.1.0/24 jump output_ipv4only comment "!fw4: Handle ipv4only IPv4 output traffic"
+ 	}
+ 
+diff --git a/tests/03_rules/09_time b/tests/03_rules/09_time
+index 7a7471b..cba1914 100644
+--- a/tests/03_rules/09_time
++++ b/tests/03_rules/09_time
+@@ -139,13 +139,13 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 	}
+ 
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 	}
+ 
+ 	chain output {
+@@ -153,7 +153,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		meta time >= "2022-05-30 21:51:23" counter accept comment "!fw4: Time rule #1"
+ 		meta time >= "2022-05-30 21:51:00" counter accept comment "!fw4: Time rule #2"
+ 		meta time >= "2022-05-30 21:00:00" counter accept comment "!fw4: Time rule #3"
+diff --git a/tests/03_rules/10_notrack b/tests/03_rules/10_notrack
+index e2b6acc..d64df11 100644
+--- a/tests/03_rules/10_notrack
++++ b/tests/03_rules/10_notrack
+@@ -103,7 +103,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		iifname "eth0" jump input_zone1 comment "!fw4: Handle zone1 IPv4/IPv6 input traffic"
+ 		iifname "lo" jump input_zone2 comment "!fw4: Handle zone2 IPv4/IPv6 input traffic"
+ 		meta nfproto ipv4 ip saddr 127.0.0.0/8 jump input_zone3 comment "!fw4: Handle zone3 IPv4 input traffic"
+@@ -113,7 +113,7 @@ table inet fw4 {
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname "eth0" jump forward_zone1 comment "!fw4: Handle zone1 IPv4/IPv6 forward traffic"
+ 		iifname "lo" jump forward_zone2 comment "!fw4: Handle zone2 IPv4/IPv6 forward traffic"
+ 		meta nfproto ipv4 ip saddr 127.0.0.0/8 jump forward_zone3 comment "!fw4: Handle zone3 IPv4 forward traffic"
+@@ -125,7 +125,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname "eth0" jump output_zone1 comment "!fw4: Handle zone1 IPv4/IPv6 output traffic"
+ 		oifname "lo" jump output_zone2 comment "!fw4: Handle zone2 IPv4/IPv6 output traffic"
+ 		meta nfproto ipv4 ip daddr 127.0.0.0/8 jump output_zone3 comment "!fw4: Handle zone3 IPv4 output traffic"
+diff --git a/tests/03_rules/11_log b/tests/03_rules/11_log
+index ecbabe5..6404a58 100644
+--- a/tests/03_rules/11_log
++++ b/tests/03_rules/11_log
+@@ -114,13 +114,13 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 	}
+ 
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 	}
+ 
+ 	chain output {
+@@ -128,7 +128,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		counter log prefix "@rule[0]: " comment "!fw4: @rule[0]"
+ 		counter log prefix "Explicit rule name: " comment "!fw4: Explicit rule name"
+ 		counter log prefix "Explicit prefix: " comment "!fw4: @rule[2]"
+diff --git a/tests/03_rules/12_mark b/tests/03_rules/12_mark
+index 67e2a0c..1d095cf 100644
+--- a/tests/03_rules/12_mark
++++ b/tests/03_rules/12_mark
+@@ -98,13 +98,13 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 	}
+ 
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 	}
+ 
+ 	chain output {
+@@ -112,7 +112,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 	}
+ 
+ 	chain prerouting {
+diff --git a/tests/04_forwardings/01_family_selections b/tests/04_forwardings/01_family_selections
+index 6f2ddae..54431ba 100644
+--- a/tests/04_forwardings/01_family_selections
++++ b/tests/04_forwardings/01_family_selections
+@@ -92,7 +92,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		iifname "eth0" jump input_wanA comment "!fw4: Handle wanA IPv4/IPv6 input traffic"
+ 		iifname "eth1" jump input_wanB comment "!fw4: Handle wanB IPv4/IPv6 input traffic"
+ 		iifname "eth2" jump input_lan comment "!fw4: Handle lan IPv4/IPv6 input traffic"
+@@ -101,7 +101,7 @@ table inet fw4 {
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname "eth0" jump forward_wanA comment "!fw4: Handle wanA IPv4/IPv6 forward traffic"
+ 		iifname "eth1" jump forward_wanB comment "!fw4: Handle wanB IPv4/IPv6 forward traffic"
+ 		iifname "eth2" jump forward_lan comment "!fw4: Handle lan IPv4/IPv6 forward traffic"
+@@ -112,7 +112,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname "eth0" jump output_wanA comment "!fw4: Handle wanA IPv4/IPv6 output traffic"
+ 		oifname "eth1" jump output_wanB comment "!fw4: Handle wanB IPv4/IPv6 output traffic"
+ 		oifname "eth2" jump output_lan comment "!fw4: Handle lan IPv4/IPv6 output traffic"
+diff --git a/tests/05_ipsets/01_declaration b/tests/05_ipsets/01_declaration
+index 88f6171..cebb337 100644
+--- a/tests/05_ipsets/01_declaration
++++ b/tests/05_ipsets/01_declaration
+@@ -88,13 +88,13 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 	}
+ 
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 	}
+ 
+ 	chain output {
+@@ -102,7 +102,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 	}
+ 
+ 	chain prerouting {
+diff --git a/tests/05_ipsets/02_usage b/tests/05_ipsets/02_usage
+index 0f919af..6bff992 100644
+--- a/tests/05_ipsets/02_usage
++++ b/tests/05_ipsets/02_usage
+@@ -162,13 +162,13 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 	}
+ 
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		meta nfproto ipv4 meta l4proto tcp ip saddr . tcp dport @test-set-1 counter comment "!fw4: Rule using test set #1"
+ 		meta nfproto ipv4 meta l4proto tcp ip saddr . tcp sport @test-set-2 counter comment "!fw4: Rule using test set #2, match direction should default to 'source'"
+ 		meta nfproto ipv4 meta l4proto tcp ip daddr . tcp sport @test-set-1 counter comment "!fw4: Rule using test set #1, overriding match direction"
+@@ -182,7 +182,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 	}
+ 
+ 	chain prerouting {
+diff --git a/tests/06_includes/01_nft_includes b/tests/06_includes/01_nft_includes
+index 314a428..275f9ee 100644
+--- a/tests/06_includes/01_nft_includes
++++ b/tests/06_includes/01_nft_includes
+@@ -156,7 +156,7 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		iifname "eth0" jump input_test comment "!fw4: Handle test IPv4/IPv6 input traffic"
+ 	}
+ 
+@@ -164,7 +164,7 @@ table inet fw4 {
+ 		type filter hook forward priority filter; policy drop;
+ 
+ 		include "/usr/share/nftables.d/include-chain-start-forward.nft"
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname "eth0" jump forward_test comment "!fw4: Handle test IPv4/IPv6 forward traffic"
+ 		include "/usr/share/nftables.d/include-chain-end-forward.nft"
+ 	}
+@@ -174,7 +174,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname "eth0" jump output_test comment "!fw4: Handle test IPv4/IPv6 output traffic"
+ 	}
+ 
+diff --git a/tests/06_includes/02_firewall.user_include b/tests/06_includes/02_firewall.user_include
+index fa398ff..e822fb8 100644
+--- a/tests/06_includes/02_firewall.user_include
++++ b/tests/06_includes/02_firewall.user_include
+@@ -93,14 +93,14 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		iifname "eth0" jump input_test comment "!fw4: Handle test IPv4/IPv6 input traffic"
+ 	}
+ 
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname "eth0" jump forward_test comment "!fw4: Handle test IPv4/IPv6 forward traffic"
+ 	}
+ 
+@@ -109,7 +109,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname "eth0" jump output_test comment "!fw4: Handle test IPv4/IPv6 output traffic"
+ 	}
+ 
+diff --git a/tests/06_includes/04_disabled_include b/tests/06_includes/04_disabled_include
+index ac0a6c8..b0072d3 100644
+--- a/tests/06_includes/04_disabled_include
++++ b/tests/06_includes/04_disabled_include
+@@ -99,14 +99,14 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		iifname "eth0" jump input_test comment "!fw4: Handle test IPv4/IPv6 input traffic"
+ 	}
+ 
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname "eth0" jump forward_test comment "!fw4: Handle test IPv4/IPv6 forward traffic"
+ 	}
+ 
+@@ -115,7 +115,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname "eth0" jump output_test comment "!fw4: Handle test IPv4/IPv6 output traffic"
+ 	}
+ 
+diff --git a/tests/06_includes/05_automatic_includes b/tests/06_includes/05_automatic_includes
+index 53cc6f8..f2b89c3 100644
+--- a/tests/06_includes/05_automatic_includes
++++ b/tests/06_includes/05_automatic_includes
+@@ -99,14 +99,14 @@ table inet fw4 {
+ 
+ 		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow inbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		iifname "eth0" jump input_test comment "!fw4: Handle test IPv4/IPv6 input traffic"
+ 	}
+ 
+ 	chain forward {
+ 		type filter hook forward priority filter; policy drop;
+ 
+-		ct state established,related accept comment "!fw4: Allow forwarded established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+ 		iifname "eth0" jump forward_test comment "!fw4: Handle test IPv4/IPv6 forward traffic"
+ 	}
+ 
+@@ -115,7 +115,7 @@ table inet fw4 {
+ 
+ 		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+-		ct state established,related accept comment "!fw4: Allow outbound established and related flows"
++		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname "eth0" jump output_test comment "!fw4: Handle test IPv4/IPv6 output traffic"
+ 	}
+ 
+-- 
+2.42.1
+
