@@ -1,0 +1,217 @@
+From 590984e702e8118c01b4efe7a50dc296e8d21229 Mon Sep 17 00:00:00 2001
+From: Luiz Angelo Daros de Luca <luizluca@gmail.com>
+Date: Mon, 31 Jul 2023 19:18:30 -0300
+Subject: [PATCH 03/10] fw4: add support for zone log_limit
+
+It is equivalent to the fw3 feature, affecting not accepted packets
+and rules explicitily setting the log property.
+
+Input rules not associated with a zone will not have log_limit.
+Forward rules will use src zone log_limit or, if missing, dest zone
+log_limit.
+
+Signed-off-by: Luiz Angelo Daros de Luca <luizluca@gmail.com>
+[properly handle null zone references, whitespace and indentation cleanup,
+ testcase cleanup, slight code simplification, use dot for named limit,
+ properly format limit expressions]
+Signed-off-by: Jo-Philipp Wich <jo@mein.io>
+---
+ .../usr/share/firewall4/templates/redirect.uc | 17 +++++++++-----
+ root/usr/share/firewall4/templates/rule.uc    | 23 +++++++++++--------
+ root/usr/share/firewall4/templates/ruleset.uc | 18 ++++++++++++++-
+ .../firewall4/templates/zone-drop-invalid.uc  | 11 ++++++---
+ .../share/firewall4/templates/zone-verdict.uc | 15 ++++++++----
+ root/usr/share/ucode/fw4.uc                   |  2 +-
+ 6 files changed, 61 insertions(+), 25 deletions(-)
+
+diff --git a/root/usr/share/firewall4/templates/redirect.uc b/root/usr/share/firewall4/templates/redirect.uc
+index 933fbd7..c1310a7 100644
+--- a/root/usr/share/firewall4/templates/redirect.uc
++++ b/root/usr/share/firewall4/templates/redirect.uc
+@@ -61,15 +61,20 @@
+ 	{{ fw4.concat(redirect.ipset.fields) }}{{
+ 		redirect.ipset.invert ? ' !=' : ''
+ 	}} @{{ redirect.ipset.name }} {%+ endif -%}
+-{%+ if (redirect.counter): -%}
++{%+ if (redirect.log && zone?.log_limit): -%}
++	limit name "{{ zone.name }}.log_limit" log prefix {{ fw4.quote(redirect.log, true) }}
++		{%+ include("redirect.uc", { fw4, zone, redirect: { ...redirect, log: 0 } }) %}
++{%+ else -%}
++{%+  if (redirect.counter): -%}
+ 	counter {%+ endif -%}
+-{%+ if (redirect.log): -%}
++{%+  if (redirect.log): -%}
+ 	log prefix {{ fw4.quote(redirect.log, true) }} {%+ endif -%}
+-{% if (redirect.target == "redirect"): -%}
++{%   if (redirect.target == "redirect"): -%}
+ 	redirect{% if (redirect.rport): %} to {{ fw4.port(redirect.rport) }}{% endif %}
+-{%- elif (redirect.target == "accept" || redirect.target == "masquerade"): -%}
++{%-  elif (redirect.target == "accept" || redirect.target == "masquerade"): -%}
+ 	{{ redirect.target }}
+-{%- else -%}
++{%-  else -%}
+ 	{{ redirect.target }} {{ redirect.raddr ? fw4.host(redirect.raddr, redirect.rport != null) : '' }}
+ 	{%- if (redirect.rport): %}:{{ fw4.port(redirect.rport) }}{% endif %}
+-{% endif %} comment {{ fw4.quote(`!fw4: ${redirect.name}`, true) }}
++{%   endif %} comment {{ fw4.quote(`!fw4: ${redirect.name}`, true) }}
++{%  endif -%}
+diff --git a/root/usr/share/firewall4/templates/rule.uc b/root/usr/share/firewall4/templates/rule.uc
+index 439d0fc..274fb70 100644
+--- a/root/usr/share/firewall4/templates/rule.uc
++++ b/root/usr/share/firewall4/templates/rule.uc
+@@ -69,11 +69,15 @@
+ 	{{ fw4.concat(rule.ipset.fields) }}{{
+ 		rule.ipset.invert ? ' !=' : ''
+ 	}} @{{ rule.ipset.name }} {%+ endif -%}
+-{%+ if (rule.counter): -%}
++{%+ if (rule.log && zone?.log_limit): -%}
++	limit name "{{ zone.name }}.log_limit" log prefix {{ fw4.quote(rule.log, true) }}
++		{%+ include("rule.uc", { fw4, zone, rule: { ...rule, log: 0 } }) %}
++{%+ else -%}
++{%+  if (rule.counter): -%}
+ 	counter {%+ endif -%}
+-{%+ if (rule.log): -%}
++{%+  if (rule.log): -%}
+ 	log prefix {{ fw4.quote(rule.log, true) }} {%+ endif -%}
+-{%+ if (rule.target == "mark"): -%}
++{%+  if (rule.target == "mark"): -%}
+ 	meta mark set {{
+ 		(rule.set_xmark.mask == 0xFFFFFFFF)
+ 			? fw4.hex(rule.set_xmark.mark)
+@@ -85,15 +89,16 @@
+ 						? `mark xor ${fw4.hex(rule.set_xmark.mark)}`
+ 						: `mark and ${fw4.hex(~rule.set_xmark.mask & 0xFFFFFFFF)} xor ${fw4.hex(rule.set_xmark.mark)}`
+ 	}} {%+
+-   elif (rule.target == "dscp"): -%}
++     elif (rule.target == "dscp"): -%}
+ 	{{ fw4.ipproto(rule.family) }} dscp set {{ fw4.hex(rule.set_dscp.dscp) }} {%+
+-   elif (rule.target == "notrack"): -%}
++     elif (rule.target == "notrack"): -%}
+ 	notrack {%+
+-   elif (rule.target == "helper"): -%}
++     elif (rule.target == "helper"): -%}
+ 	ct helper set {{ fw4.quote(rule.set_helper.name, true) }} {%+
+-   elif (rule.jump_chain): -%}
++     elif (rule.jump_chain): -%}
+ 	jump {{ rule.jump_chain }} {%+
+-   elif (rule.target): -%}
++     elif (rule.target): -%}
+ 	{{ rule.target }} {%+
+-   endif -%}
++     endif -%}
+ comment {{ fw4.quote(`!fw4: ${rule.name}`, true) }}
++{%+ endif -%}
+diff --git a/root/usr/share/firewall4/templates/ruleset.uc b/root/usr/share/firewall4/templates/ruleset.uc
+index b810a95..219cd02 100644
+--- a/root/usr/share/firewall4/templates/ruleset.uc
++++ b/root/usr/share/firewall4/templates/ruleset.uc
+@@ -2,6 +2,7 @@
+ 	let flowtable_devices = fw4.resolve_offload_devices();
+ 	let available_helpers = filter(fw4.helpers(), h => h.available);
+ 	let defined_ipsets = fw4.ipsets();
++	let zones_with_limits = filter(fw4.zones(), z => z.log_limit);
+ -%}
+ 
+ table inet fw4
+@@ -82,6 +83,20 @@ table inet fw4 {
+ 
+ {% endfor %}
+ 
++{% if (length(zones_with_limits)): %}
++	#
++	# Limits
++	#
++
++{%   for (let zone in zones_with_limits): %}
++	limit {{ zone.name }}.log_limit {
++		comment "{{ zone.name }} log limit"
++		rate {{ zone.log_limit.rate }}/{{ zone.log_limit.unit }}
++	}
++
++{%   endfor %}
++
++{% endif %}
+ 	#
+ 	# User includes
+ 	#
+@@ -131,7 +146,7 @@ table inet fw4 {
+ 		ct state invalid drop comment "!fw4: Drop flows with invalid conntrack state"
+ {% endif %}
+ {% for (let rule in fw4.rules("forward")): %}
+-		{%+ include("rule.uc", { fw4, zone: null, rule }) %}
++		{%+ include("rule.uc", { fw4, zone: (rule.src?.zone?.log_limit ? rule.src.zone : rule.dest?.zone), rule }) %}
+ {% endfor %}
+ {% for (let zone in fw4.zones()): for (let rule in zone.match_rules): %}
+ 		{%+ include("zone-jump.uc", { fw4, zone, rule, direction: "forward" }) %}
+@@ -245,6 +260,7 @@ table inet fw4 {
+ {%  fw4.includes('chain-append', `forward_${zone.name}`) %}
+ 		jump {{ zone.forward }}_to_{{ zone.name }}
+ {%  if (fw4.forward_policy() != "accept" && (zone.log & 1)): %}
++		{%+ if (zone.log_limit): %}limit name "{{ zone.name }}.log_limit" {%+ endif -%}
+ 		log prefix "{{ fw4.forward_policy() }} {{ zone.name }} forward: "
+ {%  endif %}
+ 	}
+diff --git a/root/usr/share/firewall4/templates/zone-drop-invalid.uc b/root/usr/share/firewall4/templates/zone-drop-invalid.uc
+index d16bc0b..474768d 100644
+--- a/root/usr/share/firewall4/templates/zone-drop-invalid.uc
++++ b/root/usr/share/firewall4/templates/zone-drop-invalid.uc
+@@ -1,8 +1,13 @@
+ {%+ if (zone.masq ^ zone.masq6): -%}
+ 	meta nfproto {{ fw4.nfproto(zone.masq ? 4 : 6) }} {%+ endif -%}
+-{%+  include("zone-match.uc", { egress: true, rule }) -%}
+-ct state invalid {%+ if (zone.counter): -%}
++{%+ include("zone-match.uc", { egress: true, rule }) -%}
++ct state invalid {%+ if ((zone.log & 1) && zone.log_limit): -%}
++	limit name "{{ zone.name }}.log_limit" log prefix "drop {{ zone.name }} invalid ct state: "
++		{%+ include("zone-drop-invalid.uc", { fw4, zone: { ...zone, log: 0 }, rule }) %}
++{%+ else -%}
++{%+  if (zone.counter): -%}
+ 	counter {%+ endif -%}
+-{%+ if (zone.log & 1): -%}
++{%+  if (zone.log & 1): -%}
+ 	log prefix "drop {{ zone.name }} invalid ct state: " {%+ endif -%}
+ drop comment "!fw4: Prevent NAT leakage"
++{%+ endif -%}
+diff --git a/root/usr/share/firewall4/templates/zone-verdict.uc b/root/usr/share/firewall4/templates/zone-verdict.uc
+index 6a9c8f6..61dd06e 100644
+--- a/root/usr/share/firewall4/templates/zone-verdict.uc
++++ b/root/usr/share/firewall4/templates/zone-verdict.uc
+@@ -1,12 +1,17 @@
+ {%+ if (rule.family): -%}
+ 	meta nfproto {{ fw4.nfproto(rule.family) }} {%+ endif -%}
+ {%+ include("zone-match.uc", { egress, rule }) -%}
+-{%+ if (zone.counter): -%}
++{%+ if (verdict != "accept" && (zone.log & 1) && zone.log_limit): -%}
++	limit name "{{ zone.name }}.log_limit" log prefix "{{ verdict }} {{ zone.name }} {{ egress ? "out" : "in" }}: "
++		{%+ include("zone-verdict.uc", { fw4, zone: { ...zone, log: 0 }, rule, egress, verdict }) %}
++{%+ else -%}
++{%+  if (zone.counter): -%}
+ 	counter {%+ endif -%}
+-{%+ if (verdict != "accept" && (zone.log & 1)): -%}
++{%+  if (verdict != "accept" && (zone.log & 1)): -%}
+ 	log prefix "{{ verdict }} {{ zone.name }} {{ egress ? "out" : "in" }}: " {%+ endif -%}
+-{% if (verdict == "reject"): -%}
++{%   if (verdict == "reject"): -%}
+ 	jump handle_reject comment "!fw4: reject {{ zone.name }} {{ fw4.nfproto(rule.family, true) }} traffic"
+-{% else -%}
++{%   else -%}
+ 	{{ verdict }} comment "!fw4: {{ verdict }} {{ zone.name }} {{ fw4.nfproto(rule.family, true) }} traffic"
+-{% endif -%}
++{%   endif -%}
++{%  endif -%}
+diff --git a/root/usr/share/ucode/fw4.uc b/root/usr/share/ucode/fw4.uc
+index d25afb7..7b6eb18 100644
+--- a/root/usr/share/ucode/fw4.uc
++++ b/root/usr/share/ucode/fw4.uc
+@@ -1990,7 +1990,7 @@ return {
+ 			custom_chains: [ "bool", null, UNSUPPORTED ],
+ 
+ 			log: [ "int" ],
+-			log_limit: [ "limit", null, UNSUPPORTED ],
++			log_limit: [ "limit" ],
+ 
+ 			auto_helper: [ "bool", "1" ],
+ 			helper: [ "cthelper", null, PARSE_LIST ],
+-- 
+2.42.1
+
