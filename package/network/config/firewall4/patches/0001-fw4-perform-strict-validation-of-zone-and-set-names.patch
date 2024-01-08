@@ -1,0 +1,55 @@
+From 9ace9a9d57a17e502da8d23df02114dc1ecb101a Mon Sep 17 00:00:00 2001
+From: Jo-Philipp Wich <jo@mein.io>
+Date: Thu, 12 Oct 2023 09:33:32 +0200
+Subject: [PATCH 01/11] fw4: perform strict validation of zone and set names
+
+The nft syntax grammar requires unquoted chain and set names which imposes
+certain format restrictions. Introduce a new `identifier` datatype and use
+it for validating set and zone names.
+
+Fixes: https://github.com/openwrt/luci/issues/6633
+Signed-off-by: Jo-Philipp Wich <jo@mein.io>
+---
+ root/usr/share/ucode/fw4.uc | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+--- a/root/usr/share/ucode/fw4.uc
++++ b/root/usr/share/ucode/fw4.uc
+@@ -1573,6 +1573,10 @@ return {
+ 		]), "postpend", "append");
+ 	},
+ 
++	parse_identifier: function(val) {
++		return match(val, /^[a-zA-Z_.][a-zA-Z0-9\/_.-]*$/)?.[0];
++	},
++
+ 	parse_string: function(val) {
+ 		return "" + val;
+ 	},
+@@ -1960,7 +1964,7 @@ return {
+ 		let zone = this.parse_options(data, {
+ 			enabled: [ "bool", "1" ],
+ 
+-			name: [ "string", null, REQUIRED ],
++			name: [ "identifier", null, REQUIRED ],
+ 			family: [ "family" ],
+ 
+ 			network: [ "device", null, PARSE_LIST ],
+@@ -3185,7 +3189,7 @@ return {
+ 			reload: [ "bool", null, UNSUPPORTED ],
+ 
+ 			position: [ "includeposition" ],
+-			chain: [ "string" ]
++			chain: [ "identifier" ]
+ 		});
+ 
+ 		if (!inc.enabled) {
+@@ -3247,7 +3251,7 @@ return {
+ 			counters: [ "bool" ],
+ 			comment: [ "string" ],
+ 
+-			name: [ "string", null, REQUIRED ],
++			name: [ "identifier", null, REQUIRED ],
+ 			family: [ "family", "4" ],
+ 
+ 			storage: [ "string", null, UNSUPPORTED ],
