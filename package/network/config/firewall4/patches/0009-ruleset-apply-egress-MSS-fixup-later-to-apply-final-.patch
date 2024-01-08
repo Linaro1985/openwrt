@@ -1,0 +1,75 @@
+From 9ff9c7ba155b54829376d594ea19e8f0400b130f Mon Sep 17 00:00:00 2001
+From: Andris PE <neandris@gmail.com>
+Date: Wed, 21 Jun 2023 13:06:24 +0300
+Subject: [PATCH 09/10] ruleset: apply egress MSS fixup later to apply final
+ MTU before wire
+
+Reduce scope of MSS fixup to TCP SYN packets only and relocate the fixing
+of egress MSS to the mangle/postrouting chain in order to properly apply
+final known MTU size.
+
+Fixes: openwrt/openwrt#12112
+Signed-off-by: Andris PE <neandris@gmail.com>
+[fix S-o-b tag, fix commit author, reword commit message]
+Signed-off-by: Jo-Philipp Wich <jo@mein.io>
+---
+ root/usr/share/firewall4/templates/ruleset.uc     | 8 +++++++-
+ root/usr/share/firewall4/templates/zone-mssfix.uc | 2 +-
+ tests/01_configuration/01_ruleset                 | 4 ++--
+ 3 files changed, 10 insertions(+), 4 deletions(-)
+
+--- a/root/usr/share/firewall4/templates/ruleset.uc
++++ b/root/usr/share/firewall4/templates/ruleset.uc
+@@ -424,6 +424,13 @@ table inet fw4 {
+ {% for (let rule in fw4.rules("mangle_postrouting")): %}
+ 		{%+ include("rule.uc", { fw4, zone: null, rule }) %}
+ {% endfor %}
++{% for (let zone in fw4.zones()): %}
++{%  if (zone.mtu_fix): %}
++{%   for (let rule in zone.match_rules): %}
++		{%+ include("zone-mssfix.uc", { fw4, zone, rule, egress: true }) %}
++{%   endfor %}
++{%  endif %}
++{% endfor %}
+ {% fw4.includes('chain-append', 'mangle_postrouting') %}
+ 	}
+ 
+@@ -455,7 +462,6 @@ table inet fw4 {
+ {%  if (zone.mtu_fix): %}
+ {%   for (let rule in zone.match_rules): %}
+ 		{%+ include("zone-mssfix.uc", { fw4, zone, rule, egress: false }) %}
+-		{%+ include("zone-mssfix.uc", { fw4, zone, rule, egress: true }) %}
+ {%   endfor %}
+ {%  endif %}
+ {% endfor %}
+--- a/root/usr/share/firewall4/templates/zone-mssfix.uc
++++ b/root/usr/share/firewall4/templates/zone-mssfix.uc
+@@ -1,7 +1,7 @@
+ {%+ if (rule.family): -%}
+ 	meta nfproto {{ fw4.nfproto(rule.family) }} {%+ endif -%}
+ {%+ include("zone-match.uc", { egress, rule }) -%}
+-tcp flags syn tcp option maxseg size set rt mtu {%+ if (zone.log & 2): -%}
++tcp flags syn / syn,fin,rst tcp option maxseg size set rt mtu {%+ if (zone.log & 2): -%}
+ 	log prefix "MSSFIX {{ zone.name }} out: " {%+ endif -%}
+ comment "!fw4: Zone {{ zone.name }} {{
+ 	fw4.nfproto(rule.family, true)
+--- a/tests/01_configuration/01_ruleset
++++ b/tests/01_configuration/01_ruleset
+@@ -269,6 +269,7 @@ table inet fw4 {
+ 
+ 	chain mangle_postrouting {
+ 		type filter hook postrouting priority mangle; policy accept;
++		oifname "pppoe-wan" tcp flags syn / syn,fin,rst tcp option maxseg size set rt mtu comment "!fw4: Zone wan IPv4/IPv6 egress MTU fixing"
+ 	}
+ 
+ 	chain mangle_input {
+@@ -281,8 +282,7 @@ table inet fw4 {
+ 
+ 	chain mangle_forward {
+ 		type filter hook forward priority mangle; policy accept;
+-		iifname "pppoe-wan" tcp flags syn tcp option maxseg size set rt mtu comment "!fw4: Zone wan IPv4/IPv6 ingress MTU fixing"
+-		oifname "pppoe-wan" tcp flags syn tcp option maxseg size set rt mtu comment "!fw4: Zone wan IPv4/IPv6 egress MTU fixing"
++		iifname "pppoe-wan" tcp flags syn / syn,fin,rst tcp option maxseg size set rt mtu comment "!fw4: Zone wan IPv4/IPv6 ingress MTU fixing"
+ 	}
+ }
+ -- End --

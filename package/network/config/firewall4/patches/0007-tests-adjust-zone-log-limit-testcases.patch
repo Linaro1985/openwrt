@@ -1,0 +1,33 @@
+From 04aa9a8936e666b833aa6318993d2e9d13455f1e Mon Sep 17 00:00:00 2001
+From: Jo-Philipp Wich <jo@mein.io>
+Date: Fri, 3 Nov 2023 14:14:15 +0100
+Subject: [PATCH 07/10] tests: adjust zone log limit testcases
+
+Fix testcase failure introduced by a previous commit.
+
+Fixes: a5553da ("ruleset: reduce ksoftirqd load by refering to looopback by numeric id")
+Signed-off-by: Jo-Philipp Wich <jo@mein.io>
+---
+ tests/02_zones/08_log_limit | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+--- a/tests/02_zones/08_log_limit
++++ b/tests/02_zones/08_log_limit
+@@ -238,7 +238,7 @@ table inet fw4 {
+ 	chain input {
+ 		type filter hook input priority filter; policy drop;
+ 
+-		iifname "lo" accept comment "!fw4: Accept traffic from loopback"
++		iif "lo" accept comment "!fw4: Accept traffic from loopback"
+ 
+ 		ct state vmap { established : accept, related : accept } comment "!fw4: Handle inbound flows"
+ 		tcp dport 1007 counter log prefix "@rule[6]: " comment "!fw4: @rule[6]"
+@@ -267,7 +267,7 @@ table inet fw4 {
+ 	chain output {
+ 		type filter hook output priority filter; policy drop;
+ 
+-		oifname "lo" accept comment "!fw4: Accept traffic towards loopback"
++		oif "lo" accept comment "!fw4: Accept traffic towards loopback"
+ 
+ 		ct state vmap { established : accept, related : accept } comment "!fw4: Handle outbound flows"
+ 		oifname "br-lan" jump output_lan comment "!fw4: Handle lan IPv4/IPv6 output traffic"
