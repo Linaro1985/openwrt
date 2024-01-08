@@ -15,6 +15,8 @@ PKG_MIRROR_HASH:=038b5b5611425e3c0fcc3ef4a0aea37296733300766d787909a689d16d4f39b
 PKG_MAINTAINER:=Jo-Philipp Wich <jo@mein.io>
 PKG_LICENSE:=ISC
 
+PKG_FLAGS:=hold
+
 include $(INCLUDE_DIR)/package.mk
 
 define Package/firewall4
