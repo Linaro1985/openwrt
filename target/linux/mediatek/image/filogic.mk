@@ -323,12 +323,34 @@ define Device/glinet_gl-mt3000
 endef
 TARGET_DEVICES += glinet_gl-mt3000
 
+define Device/glinet_packages
+  # usb storage support
+  DEVICE_PACKAGES += kmod-usb-storage kmod-usb-storage-uas kmod-fs-ext4 block-mount
+  # netfilter nathelper
+  DEVICE_PACKAGES += kmod-nf-nathelper kmod-nf-nathelper-extra
+  # net tools
+  DEVICE_PACKAGES += iperf3 tcpdump openssh-sftp-server pppoe-discovery
+  # sys utils
+  DEVICE_PACKAGES += nano mmc-utils mc shadow-utils shadow-useradd shadow-userdel shadow-usermod
+  # timezones
+  DEVICE_PACKAGES += zoneinfo-all
+  # services
+  DEVICE_PACKAGES += stubby
+  # luci theme
+  DEVICE_PACKAGES += luci-theme-material
+  # luci proto
+  DEVICE_PACKAGES += luci-proto-wireguard
+  # luci applications
+  DEVICE_PACKAGES += luci-app-ddns luci-app-hd-idle luci-app-ksmbd luci-app-minidlna luci-app-usteer
+endef
+
 define Device/glinet_gl-mt6000
   DEVICE_VENDOR := GL.iNet
   DEVICE_MODEL := GL-MT6000
   DEVICE_DTS := mt7986a-glinet-gl-mt6000
   DEVICE_DTS_DIR := ../dts
   DEVICE_PACKAGES := e2fsprogs f2fsck mkf2fs kmod-usb3 kmod-mt7986-firmware mt7986-wo-firmware
+  $(Device/glinet_packages)
   IMAGES += factory.bin
   IMAGE/factory.bin := append-kernel | pad-to 32M | append-rootfs
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-gl-metadata
