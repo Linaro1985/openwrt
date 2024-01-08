@@ -1,3 +1,5 @@
+include ./common-linaro.mk
+
 DTS_DIR := $(DTS_DIR)/mediatek
 
 define Image/Prepare
@@ -459,6 +461,7 @@ define Device/glinet_gl-mt3000
   DEVICE_DTS_DIR := ../dts
   SUPPORTED_DEVICES += glinet,mt3000-snand
   DEVICE_PACKAGES := kmod-mt7981-firmware mt7981-wo-firmware kmod-hwmon-pwmfan kmod-usb3
+  $(Device/LinaroPackages)
   UBINIZE_OPTS := -E 5
   BLOCKSIZE := 128k
   PAGESIZE := 2048
@@ -474,12 +477,13 @@ define Device/glinet_gl-mt6000
   DEVICE_DTS := mt7986a-glinet-gl-mt6000
   DEVICE_DTS_DIR := ../dts
   DEVICE_PACKAGES := e2fsprogs f2fsck mkf2fs kmod-usb3 kmod-mt7986-firmware mt7986-wo-firmware
-  IMAGES += factory.bin
-  IMAGE/factory.bin := append-kernel | pad-to 32M | append-rootfs
+  $(Device/LinaroPackages)
+#  IMAGES += factory.bin
+#  IMAGE/factory.bin := append-kernel | pad-to 32M | append-rootfs
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-gl-metadata
-  ARTIFACTS := preloader.bin bl31-uboot.fip
-  ARTIFACT/preloader.bin := mt7986-bl2 emmc-ddr4
-  ARTIFACT/bl31-uboot.fip := mt7986-bl31-uboot glinet_gl-mt6000
+#  ARTIFACTS := preloader.bin bl31-uboot.fip
+#  ARTIFACT/preloader.bin := mt7986-bl2 emmc-ddr4
+#  ARTIFACT/bl31-uboot.fip := mt7986-bl31-uboot glinet_gl-mt6000
 endef
 TARGET_DEVICES += glinet_gl-mt6000
 
@@ -801,6 +805,7 @@ define Device/routerich_ax3000
   DEVICE_DTS := mt7981b-routerich-ax3000
   DEVICE_DTS_DIR := ../dts
   DEVICE_PACKAGES := kmod-mt7981-firmware mt7981-wo-firmware kmod-usb3
+  $(Device/LinaroPackages)
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
   SUPPORTED_DEVICES += mediatek,mt7981-spim-snand-rfb
 endef
