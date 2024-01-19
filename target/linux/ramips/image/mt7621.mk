@@ -1513,6 +1513,20 @@ define Device/jcg_y2
 endef
 TARGET_DEVICES += jcg_y2
 
+define Device/keenetic_kn-1010
+  $(Device/nand)
+  $(Device/uimage-lzma-loader)
+  IMAGE_SIZE := 128256k
+  DEVICE_VENDOR := Keenetic
+  DEVICE_MODEL := KN-1010
+  DEVICE_PACKAGES := kmod-mt7615-firmware kmod-usb3 kmod-sfp \
+	-uboot-envtools
+  IMAGES += factory.bin
+  IMAGE/factory.bin := append-kernel | pad-to $$(KERNEL_SIZE) | append-ubi | \
+	check-size | zyimage -d 0x801010 -v "KN-1010"
+endef
+TARGET_DEVICES += keenetic_kn-1010
+
 define Device/keenetic_kn-3010
   $(Device/dsa-migration)
   $(Device/uimage-lzma-loader)

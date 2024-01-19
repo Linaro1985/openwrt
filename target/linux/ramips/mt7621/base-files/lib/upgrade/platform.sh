@@ -80,6 +80,7 @@ platform_do_upgrade() {
 	iptime,ax2004m|\
 	iptime,t5004|\
 	jcg,q20|\
+	keenetic,kn-1010|\
 	linksys,e5600|\
 	linksys,e7350|\
 	linksys,ea6350-v4|\
