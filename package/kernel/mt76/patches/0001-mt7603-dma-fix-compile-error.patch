@@ -1,0 +1,23 @@
+From 7ade054343a02634bc4a445676f851ca434db7fd Mon Sep 17 00:00:00 2001
+From: Maxim Anisimov <maxim.anisimov.ua@gmail.com>
+Date: Wed, 3 Apr 2024 15:49:39 +0300
+Subject: [PATCH 2/2] mt7603: dma: fix compile error
+
+---
+ mt7603/dma.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+--- a/mt7603/dma.c
++++ b/mt7603/dma.c
+@@ -55,9 +55,10 @@ mt7603_rx_loopback_skb(struct mt7603_dev
+ 
+ 	hwq = wmm_queue_map[IEEE80211_AC_BE];
+ 	if (ieee80211_is_data_qos(hdr->frame_control)) {
++		u8 qid;
+ 		tid = *ieee80211_get_qos_ctl(hdr) &
+ 			 IEEE80211_QOS_CTL_TAG1D_MASK;
+-		u8 qid = tid_to_ac[tid];
++		qid = tid_to_ac[tid];
+ 		hwq = wmm_queue_map[qid];
+ 		skb_set_queue_mapping(skb, qid);
+ 	} else if (ieee80211_is_data(hdr->frame_control)) {
