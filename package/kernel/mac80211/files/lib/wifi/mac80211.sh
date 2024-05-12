@@ -162,6 +162,7 @@ detect_mac80211() {
 		channel=""
 		htmode=""
 		ht_capab=""
+		ssid="GL-MT6000"
 
 		get_band_defaults "$dev"
 
@@ -196,6 +197,8 @@ detect_mac80211() {
 				;;
 		esac
 
+		[ "${mode_band}" != "2g" ] && ssid="${ssid}-5G"
+
 		uci -q batch <<-EOF
 			set wireless.${name}=wifi-device
 			set wireless.${name}.type=mac80211
@@ -203,14 +206,14 @@ detect_mac80211() {
 			set wireless.${name}.channel=${channel}
 			set wireless.${name}.band=${mode_band}
 			set wireless.${name}.htmode=$htmode
-			set wireless.${name}.disabled=1
 
 			set wireless.default_${name}=wifi-iface
 			set wireless.default_${name}.device=${name}
 			set wireless.default_${name}.network=lan
 			set wireless.default_${name}.mode=ap
-			set wireless.default_${name}.ssid=OpenWrt
-			set wireless.default_${name}.encryption=none
+			set wireless.default_${name}.ssid=${ssid}
+			set wireless.default_${name}.encryption=psk2+ccmp
+			set wireless.default_${name}.key=1234567890
 EOF
 		uci -q commit wireless
 	done
