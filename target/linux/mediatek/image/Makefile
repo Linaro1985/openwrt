@@ -13,6 +13,10 @@ loadaddr-$(CONFIG_TARGET_mediatek_mt7623) := 0x80008000
 loadaddr-$(CONFIG_TARGET_mediatek_mt7629) := 0x40008000
 loadaddr-$(CONFIG_TARGET_mediatek_filogic) := 0x48000000
 
+define Build/zyimage
+	$(STAGING_DIR_HOST)/bin/zyimage $(1) $@
+endef
+
 # default all platform image(fit) build
 define Device/Default
   PROFILES = Default $$(DEVICE_NAME)
