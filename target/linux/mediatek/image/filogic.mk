@@ -483,6 +483,28 @@ define Device/confiabits_mt7981
 endef
 TARGET_DEVICES += confiabits_mt7981
 
+define Device/cudy_ap3000-v1
+  DEVICE_VENDOR := Cudy
+  DEVICE_MODEL := AP3000
+  DEVICE_VARIANT := v1
+  DEVICE_DTS := mt7981b-cudy-ap3000-v1
+  DEVICE_DTS_DIR := ../dts
+  SUPPORTED_DEVICES += R49
+  DEVICE_DTS_LOADADDR := 0x44000000
+  BLOCKSIZE := 128k
+  PAGESIZE := 2048
+  IMAGE_SIZE := 65536k
+  KERNEL_IN_UBI := 1
+  KERNEL := kernel-bin | lzma | \
+	fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
+  KERNEL_INITRAMFS := kernel-bin | lzma | \
+	fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
+  IMAGES := sysupgrade.bin
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware
+endef
+TARGET_DEVICES += cudy_ap3000-v1
+
 define Device/cudy_m3000-v1
   DEVICE_VENDOR := Cudy
   DEVICE_MODEL := M3000
