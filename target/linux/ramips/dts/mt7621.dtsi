@@ -135,6 +135,14 @@
 			interrupts = <GIC_SHARED 5 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
+		crypto: crypto@4000 {
+			compatible = "mediatek,mt7621-eip93", "inside-secure,safexcel-eip93ies";
+			reg = <0x4000 0x1000>;
+
+			interrupt-parent = <&gic>;
+			interrupts = <GIC_SHARED 19 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
 		memc: syscon@5000 {
 			compatible = "mediatek,mt7621-memc", "syscon";
 			reg = <0x5000 0x1000>;
