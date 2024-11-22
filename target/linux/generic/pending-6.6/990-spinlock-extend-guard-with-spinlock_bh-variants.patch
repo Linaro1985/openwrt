@@ -1,0 +1,37 @@
+From 61b1809ddff988e486761cdd51aca9c28cf22bd8 Mon Sep 17 00:00:00 2001
+From: Christian Marangi <ansuelsmth@gmail.com>
+Date: Sat, 2 Nov 2024 18:50:33 +0100
+Subject: [PATCH] spinlock: extend guard with spinlock_bh variants
+
+Extend guard APIs with missing raw/spinlock_bh variants.
+
+Signed-off-by: Christian Marangi <ansuelsmth@gmail.com>
+Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+---
+ include/linux/spinlock.h | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+--- a/include/linux/spinlock.h
++++ b/include/linux/spinlock.h
+@@ -515,6 +515,10 @@ DEFINE_LOCK_GUARD_1(raw_spinlock_irq, ra
+ 		    raw_spin_lock_irq(_T->lock),
+ 		    raw_spin_unlock_irq(_T->lock))
+ 
++DEFINE_LOCK_GUARD_1(raw_spinlock_bh, raw_spinlock_t,
++		    raw_spin_lock_bh(_T->lock),
++		    raw_spin_unlock_bh(_T->lock))
++
+ DEFINE_LOCK_GUARD_1(raw_spinlock_irqsave, raw_spinlock_t,
+ 		    raw_spin_lock_irqsave(_T->lock, _T->flags),
+ 		    raw_spin_unlock_irqrestore(_T->lock, _T->flags),
+@@ -528,6 +532,10 @@ DEFINE_LOCK_GUARD_1(spinlock_irq, spinlo
+ 		    spin_lock_irq(_T->lock),
+ 		    spin_unlock_irq(_T->lock))
+ 
++DEFINE_LOCK_GUARD_1(spinlock_bh, spinlock_t,
++		    spin_lock_bh(_T->lock),
++		    spin_unlock_bh(_T->lock))
++
+ DEFINE_LOCK_GUARD_1(spinlock_irqsave, spinlock_t,
+ 		    spin_lock_irqsave(_T->lock, _T->flags),
+ 		    spin_unlock_irqrestore(_T->lock, _T->flags),
