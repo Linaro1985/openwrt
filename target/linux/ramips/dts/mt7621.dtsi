@@ -454,7 +454,7 @@
 	};
 
 	crypto: crypto@1e004000 {
-		compatible = "mediatek,mtk-eip93";
+		compatible = "mediatek,mtk-eip93", "inside-secure,safexcel-eip93ies";
 		reg = <0x1e004000 0x1000>;
 
 		interrupt-parent = <&gic>;
