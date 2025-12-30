@@ -2023,7 +2023,8 @@ define Device/kroks_kndrt41r1
   DEVICE_VENDOR := Kroks
   DEVICE_MODEL := KNdRt41R1
   DEVICE_PACKAGES := kmod-mt7603 kmod-mt7615e kmod-mt7663-firmware-ap \
-	kmod-usb3 kmod-usb-net-qmi-wwan kmod-usb-serial-option
+	kmod-usb3 kmod-usb-net-qmi-wwan kmod-usb-serial-option \
+	kmod-crypto-test kmod-crypto-cbc
   SUPPORTED_DEVICES += kndrt41r1
 endef
 TARGET_DEVICES += kroks_kndrt41r1
