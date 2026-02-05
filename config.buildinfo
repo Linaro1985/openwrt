@@ -1,0 +1,247 @@
+CONFIG_TARGET_mediatek=y
+CONFIG_TARGET_mediatek_filogic=y
+CONFIG_TARGET_MULTI_PROFILE=y
+CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_keenetic_kn-1012=y
+CONFIG_TARGET_DEVICE_PACKAGES_mediatek_filogic_DEVICE_keenetic_kn-1012=""
+CONFIG_ALL_KMODS=y
+CONFIG_ALL_NONSHARED=y
+CONFIG_DEVEL=y
+CONFIG_TARGET_PER_DEVICE_ROOTFS=y
+CONFIG_AUTOREMOVE=y
+# CONFIG_BPF_TOOLCHAIN_BUILD_LLVM is not set
+CONFIG_BPF_TOOLCHAIN_HOST=y
+CONFIG_BPF_TOOLCHAIN_HOST_PATH=""
+CONFIG_BUILDBOT=y
+CONFIG_CCACHE=y
+CONFIG_DOWNLOAD_TOOL_CUSTOM="aria2c"
+CONFIG_IMAGEOPT=y
+# CONFIG_JSON_OVERVIEW_IMAGE_INFO is not set
+CONFIG_KERNEL_BUILD_DOMAIN="buildhost"
+CONFIG_KERNEL_BUILD_USER="builder"
+# CONFIG_KERNEL_KALLSYMS is not set
+CONFIG_PACKAGE_attendedsysupgrade-common=y
+CONFIG_PACKAGE_cgi-io=y
+CONFIG_PACKAGE_libiwinfo=y
+CONFIG_PACKAGE_libiwinfo-data=y
+CONFIG_PACKAGE_liblucihttp=y
+CONFIG_PACKAGE_liblucihttp-ucode=y
+CONFIG_PACKAGE_luci=y
+CONFIG_PACKAGE_luci-app-attendedsysupgrade=y
+CONFIG_PACKAGE_luci-app-firewall=y
+CONFIG_PACKAGE_luci-app-package-manager=y
+CONFIG_PACKAGE_luci-base=y
+CONFIG_PACKAGE_luci-lib-uqr=y
+CONFIG_PACKAGE_luci-light=y
+CONFIG_PACKAGE_luci-mod-admin-full=y
+CONFIG_PACKAGE_luci-mod-network=y
+CONFIG_PACKAGE_luci-mod-status=y
+CONFIG_PACKAGE_luci-mod-system=y
+CONFIG_PACKAGE_luci-proto-ipv6=y
+CONFIG_PACKAGE_luci-proto-ppp=y
+CONFIG_PACKAGE_luci-ssl=y
+CONFIG_PACKAGE_luci-theme-bootstrap=y
+CONFIG_PACKAGE_px5g-mbedtls=y
+CONFIG_PACKAGE_rpcd=y
+CONFIG_PACKAGE_rpcd-mod-file=y
+CONFIG_PACKAGE_rpcd-mod-iwinfo=y
+CONFIG_PACKAGE_rpcd-mod-luci=y
+CONFIG_PACKAGE_rpcd-mod-rpcsys=y
+CONFIG_PACKAGE_rpcd-mod-rrdns=y
+CONFIG_PACKAGE_rpcd-mod-ucode=y
+CONFIG_PACKAGE_ucode-mod-html=y
+CONFIG_PACKAGE_ucode-mod-log=y
+CONFIG_PACKAGE_ucode-mod-math=y
+CONFIG_PACKAGE_uhttpd=y
+CONFIG_PACKAGE_uhttpd-mod-ubus=y
+CONFIG_REPRODUCIBLE_DEBUG_INFO=y
+# CONFIG_TARGET_ROOTFS_INITRAMFS is not set
+CONFIG_USE_LLVM_HOST=y
+CONFIG_VERSIONOPT=y
+CONFIG_VERSION_BUG_URL=""
+CONFIG_VERSION_CODE=""
+CONFIG_VERSION_DIST="OpenWrt"
+CONFIG_VERSION_FILENAMES=y
+CONFIG_VERSION_FIRMWARE_URL=""
+CONFIG_VERSION_HOME_URL=""
+CONFIG_VERSION_HWREV=""
+CONFIG_VERSION_MANUFACTURER=""
+CONFIG_VERSION_MANUFACTURER_URL=""
+CONFIG_VERSION_NUMBER=""
+CONFIG_VERSION_PRODUCT=""
+CONFIG_VERSION_REPO="https://downloads.openwrt.org/releases/25.12.0-rc4"
+CONFIG_VERSION_SUPPORT_URL=""
+# CONFIG_COLLECT_KERNEL_DEBUG is not set
+# CONFIG_IB is not set
+# CONFIG_JSON_CYCLONEDX_SBOM is not set
+# CONFIG_MAKE_TOOLCHAIN is not set
+# CONFIG_PACKAGE_e2fsprogs is not set
+# CONFIG_PACKAGE_f2fsck is not set
+# CONFIG_PACKAGE_fdisk is not set
+# CONFIG_PACKAGE_libblkid is not set
+# CONFIG_PACKAGE_libcomerr is not set
+# CONFIG_PACKAGE_libe2p is not set
+# CONFIG_PACKAGE_libext2fs is not set
+# CONFIG_PACKAGE_libf2fs is not set
+# CONFIG_PACKAGE_libfdisk is not set
+# CONFIG_PACKAGE_libncurses is not set
+# CONFIG_PACKAGE_libsmartcols is not set
+# CONFIG_PACKAGE_libss is not set
+# CONFIG_PACKAGE_libuuid is not set
+# CONFIG_PACKAGE_mkf2fs is not set
+# CONFIG_PACKAGE_mt7986-wo-firmware is not set
+# CONFIG_PACKAGE_mt7987-2p5g-phy-firmware is not set
+# CONFIG_PACKAGE_mt7988-2p5g-phy-firmware is not set
+# CONFIG_PACKAGE_mt7988-wo-firmware is not set
+# CONFIG_PACKAGE_partx-utils is not set
+# CONFIG_PACKAGE_swconfig is not set
+# CONFIG_PACKAGE_terminfo is not set
+# CONFIG_PACKAGE_zyxel-bootconfig is not set
+# CONFIG_SDK is not set
+# CONFIG_TARGET_ALL_PROFILES is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_abt_asr3000 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_acelink_ew-7886cax is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_acer_predator-w6 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_acer_predator-w6d is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_acer_predator-w6x-stock is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_acer_predator-w6x-ubootmod is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_acer_vero-w6m is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_airpi_ap3000m is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_arcadyan_mozart is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_asiarf_ap7986-003 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_asus_rt-ax52 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_asus_rt-ax57m is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_asus_rt-ax59u is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_asus_tuf-ax4200 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_asus_tuf-ax4200q is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_asus_tuf-ax6000 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_asus_zenwifi-bt8 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_asus_zenwifi-bt8-ubootmod is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_bananapi_bpi-r3 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_bananapi_bpi-r3-mini is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_bananapi_bpi-r4 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_bananapi_bpi-r4-lite is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_bananapi_bpi-r4-poe is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_buffalo_wsr-6000ax8 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cetron_ct3003 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cmcc_a10-stock is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cmcc_a10-ubootmod is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cmcc_rax3000m is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_comfast_cf-e393ax is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_comfast_cf-wr632ax is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_comfast_cf-wr632ax-ubootmod is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_confiabits_mt7981 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_creatlentem_clt-r30b1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_creatlentem_clt-r30b1-112m is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_ap3000-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_ap3000outdoor-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_m3000-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_re3000-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_tr3000-256mb-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_tr3000-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_tr3000-v1-ubootmod is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_wbr3000uax-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_wbr3000uax-v1-ubootmod is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_wr3000-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_wr3000e-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_wr3000h-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_wr3000p-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cudy_wr3000s-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_dlink_aquila-pro-ai-m30-a1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_dlink_aquila-pro-ai-m60-a1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_edgecore_eap111 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_elecom_wrc-x3000gs3 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_gatonetworks_gdsp is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_glinet_gl-mt2500 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_glinet_gl-mt2500-airoha is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_glinet_gl-mt3000 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_glinet_gl-mt6000 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_glinet_gl-x3000 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_glinet_gl-xe3000 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_h3c_magic-nx30-pro is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_huasifei_wh3000 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_huasifei_wh3000-pro is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_imou_hx21 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_iptime_ax3000m is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_iptime_ax3000q is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_iptime_ax3000se is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_iptime_ax3000sm is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_iptime_ax7800m-6e is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_jcg_q30-pro is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_jdcloud_re-cp-03 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_kebidumei_ax3000-u22 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_keenetic_kn-1812 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_keenetic_kn-3711 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_keenetic_kn-3811 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_keenetic_kn-3911 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_konka_komi-a31 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_mediatek_mt7981-rfb is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_mediatek_mt7986a-rfb-nand is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_mediatek_mt7986b-rfb is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_mediatek_mt7987a-rfb is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_mediatek_mt7988a-rfb is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_mercusys_mr80x-v3 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_mercusys_mr85x is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_mercusys_mr90x-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_mercusys_mr90x-v1-ubi is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_netcore_n60 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_netcore_n60-pro is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_netcraze_nc-1812 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_netgear_eax17 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_netgear_wax220 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_netis_nx30v2 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_netis_nx31 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_nokia_ea0326gmp is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_nradio_c8-668gl is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_openembed_som7981 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_openfi_6c is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_openwrt_one is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_qihoo_360t7 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_routerich_ax3000 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_routerich_ax3000-ubootmod is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_routerich_ax3000-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_routerich_be7200 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_ruijie_rg-x60-pro is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_smartrg_sdg-8612 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_smartrg_sdg-8614 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_smartrg_sdg-8622 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_smartrg_sdg-8632 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_smartrg_sdg-8733 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_smartrg_sdg-8733a is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_smartrg_sdg-8734 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_snr_snr-cpe-ax2 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_teltonika_rutc50 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_tenbay_wr3000k is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_totolink_x6000r is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_tplink_archer-ax80-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_tplink_archer-ax80-v1-eu is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_tplink_be450 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_tplink_fr365-v1 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_tplink_re6000xd is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_tplink_tl-xdr4288 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_tplink_tl-xdr6086 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_tplink_tl-xdr6088 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_tplink_tl-xtr8488 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_ubnt_unifi-6-plus is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_unielec_u7981-01-emmc is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_unielec_u7981-01-nand is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_wavlink_wl-wn536ax6-a is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_wavlink_wl-wn551x3 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_wavlink_wl-wn573hx3 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_wavlink_wl-wn586x3 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_wavlink_wl-wn586x3b is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_widelantech_wap430x is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_xiaomi_mi-router-ax3000t is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_xiaomi_mi-router-ax3000t-ubootmod is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_xiaomi_mi-router-wr30u-stock is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_xiaomi_mi-router-wr30u-ubootmod is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_xiaomi_redmi-router-ax6000-stock is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_xiaomi_redmi-router-ax6000-ubootmod is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_yuncore_ax835 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_zbtlink_zbt-z8102ax is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_zbtlink_zbt-z8102ax-v2 is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_zbtlink_zbt-z8103ax is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_zbtlink_zbt-z8103ax-c is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_zyxel_ex5601-t0-stock is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_zyxel_ex5601-t0-ubootmod is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_zyxel_ex5700-telenor is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_zyxel_nwa50ax-pro is not set
