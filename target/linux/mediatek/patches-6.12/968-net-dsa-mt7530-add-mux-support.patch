@@ -1,0 +1,370 @@
+From d518406965d6c6504b8a0e1614d5e6b7ddbcf276 Mon Sep 17 00:00:00 2001
+From: Maxim Anisimov <maxim.anisimov.ua@gmail.com>
+Date: Thu, 5 Feb 2026 15:23:30 +0300
+Subject: [PATCH] net: dsa: mt7530: add mux support
+
+ds_mux: ds-mux-bus {
+	ds_mux0: ds-mux@5 {
+		compatible = "mediatek,ds-mux";
+		reg = <5>;
+		chan-sel-gpios = <&pio 54 GPIO_ACTIVE_HIGH>;
+		mod-def0-gpios = <&pio 69 GPIO_ACTIVE_LOW>;
+		sfp-present-channel = <0>;
+
+		ds_channel_0: channel@0 {
+			reg = <0>;
+			phy-mode = "2500base-x";
+			phy-connection-type = "2500base-x";
+			managed = "in-band-status";
+			sfp = <&sfp1>;
+		};
+
+		ds_channel_1: channel@1 {
+			reg = <1>;
+			phy-mode = "2500base-x";
+			phy-connection-type = "2500base-x";
+			phy-handle = <&phy24>;
+		};
+	};
+};
+
+ports {
+---
+ drivers/net/dsa/mt7530-mdio.c |  11 +-
+ drivers/net/dsa/mt7530.c      | 239 ++++++++++++++++++++++++++++++++++
+ drivers/net/dsa/mt7530.h      |  19 +++
+ 3 files changed, 268 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/dsa/mt7530-mdio.c b/drivers/net/dsa/mt7530-mdio.c
+index 51df42ccd..ea2da0bb7 100644
+--- a/drivers/net/dsa/mt7530-mdio.c
++++ b/drivers/net/dsa/mt7530-mdio.c
+@@ -211,7 +211,15 @@ mt7530_probe(struct mdio_device *mdiodev)
+ 	if (priv->id == ID_MT7531)
+ 		priv->create_sgmii = mt7531_create_sgmii;
+ 
+-	return dsa_register_switch(priv->ds);
++	ret = dsa_register_switch(priv->ds);
++	if (ret) {
++		if (ret != -EPROBE_DEFER)
++			dev_err(dev, "failed to register DSA switch\n");
++		return ret;
++	}
++
++	mt7530_setup_muxes(priv);
++	return ret;
+ }
+ 
+ static void
+@@ -233,6 +241,7 @@ mt7530_remove(struct mdio_device *mdiodev)
+ 		dev_err(priv->dev, "Failed to disable io pwr: %d\n",
+ 			ret);
+ 
++	mt7530_release_muxes(priv);
+ 	mt7530_remove_common(priv);
+ 
+ 	for (i = 0; i < 2; ++i)
+diff --git a/drivers/net/dsa/mt7530.c b/drivers/net/dsa/mt7530.c
+index 93bf085a6..31f885d99 100644
+--- a/drivers/net/dsa/mt7530.c
++++ b/drivers/net/dsa/mt7530.c
+@@ -4,6 +4,7 @@
+  * Copyright (C) 2017 Sean Wang <sean.wang@mediatek.com>
+  */
+ #include <linux/etherdevice.h>
++#include <linux/gpio/consumer.h>
+ #include <linux/if_bridge.h>
+ #include <linux/iopoll.h>
+ #include <linux/mdio.h>
+@@ -3256,6 +3257,244 @@ const struct mt753x_info mt753x_table[] = {
+ };
+ EXPORT_SYMBOL_GPL(mt753x_table);
+ 
++static void sfp_monitor_work_func(struct work_struct *work)
++{
++	struct combo_port_mux *mux = container_of(work, struct combo_port_mux, sfp_monitor_work.work);
++	struct dsa_switch *ds = mux->dp->ds;
++	struct dsa_port *dp = mux->dp;
++	struct net_device *dev = mux->dp->user;
++	unsigned int new_channel;
++	int sfp_present;
++
++	if (IS_ERR(mux->mod_def0_gpio) || IS_ERR(mux->chan_sel_gpio))
++		goto reschedule;
++
++	if (!netif_running(dev))
++		goto reschedule;
++
++	sfp_present = gpiod_get_value_cansleep(mux->mod_def0_gpio);
++	new_channel = sfp_present ? mux->sfp_present_channel : !mux->sfp_present_channel;
++
++	if (mux->initialized && mux->channel == new_channel)
++		goto reschedule;
++
++	rtnl_lock();
++
++	phylink_stop(dp->pl);
++	phylink_disconnect_phy(dp->pl);
++
++	dp->dn = mux->data[new_channel]->of_node;
++	dp->pl = mux->data[new_channel]->phylink;
++
++	phylink_of_phy_connect(dp->pl, dp->dn, 0);
++	phylink_start(dp->pl);
++
++	dev_info(ds->dev, "dsa mux: switch to channel%d\n", new_channel);
++
++	gpiod_set_value_cansleep(mux->chan_sel_gpio, new_channel);
++
++	rtnl_unlock();
++
++	mux->channel = new_channel;
++	mux->initialized = true;
++
++reschedule:
++	mod_delayed_work(system_wq, &mux->sfp_monitor_work, msecs_to_jiffies(100));
++}
++
++static int ds_add_mux_channel(struct combo_port_mux *mux, struct device_node *np)
++{
++	const __be32 *_id = of_get_property(np, "reg", NULL);
++	struct dsa_switch *ds = mux->dp->ds;
++	struct dp_mux_data *data;
++	struct phylink *phylink;
++	phy_interface_t phy_mode;
++	int id, err;
++
++	if (!_id) {
++		dev_err(ds->dev, "missing mux channel id\n");
++		return -EINVAL;
++	}
++
++	id = be32_to_cpup(_id);
++	if (id < 0 || id > 1) {
++		dev_err(ds->dev, "%d is not a valid mux channel id\n", id);
++		return -EINVAL;
++	}
++
++	data = kmalloc(sizeof(*data), GFP_KERNEL);
++	if (unlikely(!data)) {
++		dev_err(ds->dev, "failed to create mux data structure\n");
++		return -ENOMEM;
++	}
++
++	err = of_get_phy_mode(np, &phy_mode);
++	if (err) {
++		dev_err(ds->dev, "incorrect phy-mode\n");
++		goto err_free_data;
++	}
++
++	phylink = phylink_create(&mux->dp->pl_config,
++				 of_fwnode_handle(np),
++				 phy_mode, ds->phylink_mac_ops);
++	if (IS_ERR(phylink)) {
++		dev_err(ds->dev, "failed to create phylink structure\n");
++		err = PTR_ERR(phylink);
++		goto err_free_data;
++	}
++
++	data->of_node = np;
++	data->phylink = phylink;
++	mux->data[id] = data;
++
++	return 0;
++
++err_free_data:
++	kfree(data);
++	return err;
++}
++
++static int ds_add_mux(struct mt7530_priv *priv, struct device_node *np)
++{
++	const __be32 *_id = of_get_property(np, "reg", NULL);
++	struct device_node *child;
++	struct combo_port_mux *mux;
++	unsigned int id;
++	int err;
++
++	if (!_id) {
++		dev_err(priv->dev, "missing attach dp id\n");
++		return -EINVAL;
++	}
++
++	id = be32_to_cpup(_id);
++	if (id < 0 || id >= MT7530_NUM_PORTS) {
++		dev_err(priv->dev, "%d is not a valid attach dp id\n", id);
++		return -EINVAL;
++	}
++
++	mux = kmalloc(sizeof(struct combo_port_mux), GFP_KERNEL);
++	if (unlikely(!mux)) {
++		dev_err(priv->dev, "failed to create mux structure\n");
++		return -ENOMEM;
++	}
++
++	mux->mod_def0_gpio = fwnode_gpiod_get_index(of_fwnode_handle(np),
++						    "mod-def0", 0, GPIOD_IN |
++						    GPIOD_FLAGS_BIT_NONEXCLUSIVE, "?");
++
++	if (IS_ERR(mux->mod_def0_gpio)) {
++		dev_err(priv->dev, "failed to requset gpio for mod-def0\n");
++		err = PTR_ERR(mux->mod_def0_gpio);
++		goto err_free_mux;
++	}
++
++	mux->chan_sel_gpio = fwnode_gpiod_get_index(of_fwnode_handle(np),
++						    "chan-sel", 0, GPIOD_OUT_LOW, "?");
++
++	if (IS_ERR(mux->chan_sel_gpio)) {
++		dev_err(priv->dev, "failed to requset gpio for chan-sel\n");
++		err = PTR_ERR(mux->chan_sel_gpio);
++		goto err_put_mod_def0;
++	}
++
++	of_property_read_u32(np, "sfp-present-channel",
++			     &mux->sfp_present_channel);
++
++	priv->ds_mux[id] = mux;
++	mux->dp = dsa_to_port(priv->ds, id);
++	/* configure default channel to 2.5G PHY */
++	mux->channel = !mux->sfp_present_channel;
++	mux->initialized = false;
++
++	for_each_child_of_node(np, child) {
++		err = ds_add_mux_channel(mux, child);
++		if (err) {
++			dev_err(priv->dev, "failed to add ds_mux\n");
++			of_node_put(child);
++			goto err_put_chan_sel;
++		}
++	}
++
++	INIT_DELAYED_WORK(&mux->sfp_monitor_work, sfp_monitor_work_func);
++	mod_delayed_work(system_wq, &mux->sfp_monitor_work, msecs_to_jiffies(3000));
++
++	return 0;
++
++err_put_chan_sel:
++	gpiod_put(mux->chan_sel_gpio);
++
++err_put_mod_def0:
++	gpiod_put(mux->mod_def0_gpio);
++
++err_free_mux:
++	kfree(mux);
++	priv->ds_mux[id] = NULL;
++	return err;
++}
++
++static void mt7530_release_mux(struct mt7530_priv *priv, int id)
++{
++	struct combo_port_mux *mux = priv->ds_mux[id];
++	int i;
++
++	if (!mux)
++		return;
++
++	cancel_delayed_work_sync(&mux->sfp_monitor_work);
++
++	if (!IS_ERR_OR_NULL(mux->mod_def0_gpio))
++		gpiod_put(mux->mod_def0_gpio);
++
++	if (!IS_ERR_OR_NULL(mux->chan_sel_gpio))
++		gpiod_put(mux->chan_sel_gpio);
++
++	for (i = 0; i < 2; i++) {
++		if (mux->data[i]) {
++			if (mux->data[i]->phylink)
++				phylink_destroy(mux->data[i]->phylink);
++			kfree(mux->data[i]);
++		}
++	}
++	kfree(mux);
++	priv->ds_mux[id] = NULL;
++}
++
++void
++mt7530_setup_muxes(struct mt7530_priv *priv)
++{
++	struct device_node *mux_np;
++
++	mux_np = of_get_child_by_name(priv->ds->dev->of_node, "ds-mux-bus");
++	if (mux_np) {
++		struct device_node *child;
++
++		for_each_available_child_of_node(mux_np, child) {
++			if (!of_device_is_compatible(child,
++				"mediatek,ds-mux"))
++				continue;
++
++			if (!of_device_is_available(child))
++				continue;
++
++			if (ds_add_mux(priv, child))
++				dev_err(dev, "failed to add mux\n");
++
++
++			of_node_put(mux_np);
++		};
++	}
++}
++EXPORT_SYMBOL_GPL(mt7530_setup_muxes);
++
++void mt7530_release_muxes(struct mt7530_priv *priv)
++{
++	int i;
++	for (i = 0; i < MT7530_NUM_PORTS; i++)
++		mt7530_release_mux(priv, i);
++}
++EXPORT_SYMBOL_GPL(mt7530_release_muxes)
++
+ int
+ mt7530_probe_common(struct mt7530_priv *priv)
+ {
+diff --git a/drivers/net/dsa/mt7530.h b/drivers/net/dsa/mt7530.h
+index 6ad33a9f6..68e3b176a 100644
+--- a/drivers/net/dsa/mt7530.h
++++ b/drivers/net/dsa/mt7530.h
+@@ -785,6 +785,22 @@ struct mt753x_info {
+ 				phy_interface_t interface);
+ };
+ 
++struct dp_mux_data {
++	struct device_node	*of_node;
++	struct phylink		*phylink;
++};
++
++struct combo_port_mux {
++	struct dsa_port		*dp;
++	struct gpio_desc	*mod_def0_gpio;
++	struct gpio_desc	*chan_sel_gpio;
++	struct dp_mux_data	*data[2];
++	unsigned int		channel;
++	unsigned int		sfp_present_channel;
++	struct delayed_work	sfp_monitor_work;
++	bool			initialized;
++};
++
+ /* struct mt7530_priv -	This is the main data structure for holding the state
+  *			of the driver
+  * @dev:		The device pointer
+@@ -828,6 +844,7 @@ struct mt7530_priv {
+ 	u8			mirror_tx;
+ 	struct mt7530_port	ports[MT7530_NUM_PORTS];
+ 	struct mt753x_pcs	pcs[MT7530_NUM_PORTS];
++	struct combo_port_mux	*ds_mux[MT7530_NUM_PORTS];
+ 	/* protect among processes for registers access*/
+ 	struct mutex reg_mutex;
+ 	int irq;
+@@ -872,6 +889,8 @@ static inline void INIT_MT7530_DUMMY_POLL(struct mt7530_dummy_poll *p,
+ 	p->reg = reg;
+ }
+ 
++void mt7530_setup_muxes(struct mt7530_priv *priv);
++void mt7530_release_muxes(struct mt7530_priv *priv);
+ int mt7530_probe_common(struct mt7530_priv *priv);
+ void mt7530_remove_common(struct mt7530_priv *priv);
+ 
+-- 
+2.52.0
+
