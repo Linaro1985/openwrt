@@ -93,16 +93,13 @@
 		};
 	};
 
-	sfp4: sfp4 {
+	sfp1: sfp-1 {
 		compatible = "sff,sfp";
 		i2c-bus = <&i2c0>;
-		mod-def0-gpios = <&pio 23 GPIO_ACTIVE_LOW>;
-		los-gpios = <&pio 1 GPIO_ACTIVE_HIGH>;
-		tx-fault-gpios = <&pio 10 GPIO_ACTIVE_HIGH>;
-		tx-disable-gpios = <&pio 2 GPIO_ACTIVE_HIGH>;
-		power-gpios = <&pio 28 GPIO_ACTIVE_HIGH>;
-		mux-gpios = <&pio 27 GPIO_ACTIVE_LOW>;
-		led-gpios = <&pio 25 GPIO_ACTIVE_LOW>;
+		mod-def0-gpios = <&pio 23 GPIO_ACTIVE_LOW>;	/* gpio in */
+		los-gpios = <&pio 1 GPIO_ACTIVE_HIGH>;		/* gpio in */
+		tx-fault-gpios = <&pio 10 GPIO_ACTIVE_HIGH>;	/* gpio in */
+		tx-disable-gpios = <&pio 2 GPIO_ACTIVE_HIGH>;	/* gpio out */
 		maximum-power-milliwatt = <3000>;
 	};
 
@@ -142,6 +139,18 @@
 			gpio-export,name = "usb1power";
 			gpio-export,output = <1>;
 			gpios = <&pio 6 GPIO_ACTIVE_HIGH>;
+		};
+
+		sfp1led {
+			gpio-export,name = "sfp1led";
+			gpio-export,output = <1>;
+			gpios = <&pio 25 GPIO_ACTIVE_LOW>;
+		};
+
+		sfp1power {
+			gpio-export,name = "sfp1power";
+			gpio-export,output = <1>;
+			gpios = <&pio 28 GPIO_ACTIVE_HIGH>;
 		};
 
 		usb2power {
@@ -225,6 +234,36 @@
 };
 
 &switch {
+	ds-mux-bus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		ds-mux@5 {
+			compatible = "mediatek,ds-mux";
+			reg = <5>;
+			chan-sel-gpios = <&pio 27 GPIO_ACTIVE_LOW>;
+			mod-def0-gpios = <&pio 23 GPIO_ACTIVE_LOW>;
+			sfp-present-channel = <0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			channel@0 {
+				reg = <0>;
+				phy-mode = "2500base-x";
+				phy-connection-type = "2500base-x";
+				managed = "in-band-status";
+				sfp = <&sfp1>;
+			};
+
+			channel@1 {
+				reg = <1>;
+				phy-mode = "2500base-x";
+				phy-connection-type = "2500base-x";
+				phy-handle = <&phy13>;
+			};
+		};
+	};
+
 	ports {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -248,9 +287,12 @@
 			reg = <5>;
 			label = "lan4";
 			phy-mode = "2500base-x";
-			//phy-handle = <&phy13>;
-			managed = "in-band-status";
-			sfp = <&sfp4>;
+			phy-handle = <&phy13>;
+
+			fixed-link {
+				speed = <2500>;
+				full-duplex;
+			};
 		};
 
 		port@6 {
