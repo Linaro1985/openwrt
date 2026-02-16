@@ -1,0 +1,42 @@
+--- a/drivers/crypto/inside-secure/eip93/eip93-common.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-common.c
+@@ -123,16 +123,25 @@ void *eip93_get_descriptor(struct eip93_
+ {
+ 	struct eip93_descriptor *cdesc;
+ 	void *ptr;
++	unsigned long irqflags;
++
++	spin_lock_irqsave(&eip93->ring->read_lock, irqflags);
+ 
+ 	cdesc = eip93_ring_next_rptr(eip93, &eip93->ring->cdr);
+-	if (IS_ERR(cdesc))
++	if (IS_ERR(cdesc)) {
++		spin_unlock_irqrestore(&eip93->ring->read_lock, irqflags);
+ 		return ERR_PTR(-ENOENT);
++	}
+ 
+ 	memset(cdesc, 0, sizeof(struct eip93_descriptor));
+ 
+ 	ptr = eip93_ring_next_rptr(eip93, &eip93->ring->rdr);
+-	if (IS_ERR(ptr))
++	if (IS_ERR(ptr)) {
++		spin_unlock_irqrestore(&eip93->ring->read_lock, irqflags);
+ 		return ERR_PTR(-ENOENT);
++	}
++
++	spin_unlock_irqrestore(&eip93->ring->read_lock, irqflags);
+ 
+ 	return ptr;
+ }
+--- a/drivers/crypto/inside-secure/eip93/eip93-main.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-main.c
+@@ -207,8 +207,7 @@ get_more:
+ 	last_entry = false;
+ 
+ 	while (left) {
+-		scoped_guard(spinlock_irqsave, &eip93->ring->read_lock)
+-			rdesc = eip93_get_descriptor(eip93);
++		rdesc = eip93_get_descriptor(eip93);
+ 		if (IS_ERR(rdesc)) {
+ 			dev_err(eip93->dev, "Ndesc: %d nreq: %d\n",
+ 				handled, left);
