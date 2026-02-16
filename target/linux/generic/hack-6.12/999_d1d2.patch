@@ -1,0 +1,116 @@
+--- a/drivers/crypto/inside-secure/eip93/eip93-common.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-common.c
+@@ -573,7 +573,7 @@ int eip93_send_req(struct crypto_async_r
+ 
+ 			rctx->sa_state_ctr_base = dma_map_single(eip93->dev, rctx->sa_state_ctr,
+ 								 sizeof(*rctx->sa_state_ctr),
+-								 DMA_TO_DEVICE);
++								 DMA_BIDIRECTIONAL);
+ 			err = dma_mapping_error(eip93->dev, rctx->sa_state_ctr_base);
+ 			if (err)
+ 				goto free_sa_state_ctr;
+@@ -581,7 +581,7 @@ int eip93_send_req(struct crypto_async_r
+ 	}
+ 
+ 	rctx->sa_state_base = dma_map_single(eip93->dev, rctx->sa_state,
+-					     sizeof(*rctx->sa_state), DMA_TO_DEVICE);
++					     sizeof(*rctx->sa_state), DMA_BIDIRECTIONAL);
+ 	err = dma_mapping_error(eip93->dev, rctx->sa_state_base);
+ 	if (err)
+ 		goto free_sa_state_ctr_dma;
+@@ -624,13 +624,13 @@ free_sa_state_ctr_dma:
+ 	if (rctx->sa_state_ctr)
+ 		dma_unmap_single(eip93->dev, rctx->sa_state_ctr_base,
+ 				 sizeof(*rctx->sa_state_ctr),
+-				 DMA_TO_DEVICE);
++				 DMA_BIDIRECTIONAL);
+ free_sa_state_ctr:
+ 	kfree(rctx->sa_state_ctr);
+ 	if (rctx->sa_state)
+ 		dma_unmap_single(eip93->dev, rctx->sa_state_base,
+ 				 sizeof(*rctx->sa_state),
+-				 DMA_TO_DEVICE);
++				 DMA_BIDIRECTIONAL);
+ free_sa_state:
+ 	kfree(rctx->sa_state);
+ 
+@@ -687,12 +687,12 @@ void eip93_handle_result(struct eip93_de
+ 	if (rctx->sa_state_ctr)
+ 		dma_unmap_single(eip93->dev, rctx->sa_state_ctr_base,
+ 				 sizeof(*rctx->sa_state_ctr),
+-				 DMA_FROM_DEVICE);
++				 DMA_BIDIRECTIONAL);
+ 
+ 	if (rctx->sa_state)
+ 		dma_unmap_single(eip93->dev, rctx->sa_state_base,
+ 				 sizeof(*rctx->sa_state),
+-				 DMA_FROM_DEVICE);
++				 DMA_BIDIRECTIONAL);
+ 
+ 	if (!IS_ECB(rctx->flags))
+ 		memcpy(reqiv, rctx->sa_state->state_iv, rctx->ivsize);
+--- a/drivers/crypto/inside-secure/eip93/eip93-hash.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-hash.c
+@@ -67,7 +67,7 @@ void eip93_hash_handle_result(struct cry
+ 	int i;
+ 
+ 	dma_unmap_single(eip93->dev, rctx->sa_state_base,
+-			 sizeof(*sa_state), DMA_FROM_DEVICE);
++			 sizeof(*sa_state), DMA_BIDIRECTIONAL);
+ 
+ 	/*
+ 	 * With partial_hash assume SHA256_DIGEST_SIZE buffer is passed.
+@@ -401,7 +401,7 @@ static int eip93_hash_update(struct ahas
+ 
+ 	rctx->sa_state_base = dma_map_single(eip93->dev, sa_state,
+ 					     sizeof(*sa_state),
+-					     DMA_TO_DEVICE);
++					     DMA_BIDIRECTIONAL);
+ 	ret = dma_mapping_error(eip93->dev, rctx->sa_state_base);
+ 	if (ret)
+ 		return ret;
+@@ -425,7 +425,7 @@ free_sa_record:
+ 
+ free_sa_state:
+ 	dma_unmap_single(eip93->dev, rctx->sa_state_base,
+-			 sizeof(*sa_state), DMA_TO_DEVICE);
++			 sizeof(*sa_state), DMA_BIDIRECTIONAL);
+ 
+ 	return ret;
+ }
+@@ -477,7 +477,7 @@ static int __eip93_hash_final(struct aha
+ 	if (map_dma) {
+ 		rctx->sa_state_base = dma_map_single(eip93->dev, sa_state,
+ 						     sizeof(*sa_state),
+-						     DMA_TO_DEVICE);
++						     DMA_BIDIRECTIONAL);
+ 		ret = dma_mapping_error(eip93->dev, rctx->sa_state_base);
+ 		if (ret)
+ 			return ret;
+@@ -506,7 +506,7 @@ free_blocks:
+ 
+ free_sa_state:
+ 	dma_unmap_single(eip93->dev, rctx->sa_state_base,
+-			 sizeof(*sa_state), DMA_TO_DEVICE);
++			 sizeof(*sa_state), DMA_BIDIRECTIONAL);
+ 
+ 	return ret;
+ }
+@@ -529,7 +529,7 @@ static int eip93_hash_finup(struct ahash
+ 	if (rctx->len + req->nbytes || IS_HMAC(ctx->flags)) {
+ 		rctx->sa_state_base = dma_map_single(eip93->dev, sa_state,
+ 						     sizeof(*sa_state),
+-						     DMA_TO_DEVICE);
++						     DMA_BIDIRECTIONAL);
+ 		ret = dma_mapping_error(eip93->dev, rctx->sa_state_base);
+ 		if (ret)
+ 			return ret;
+@@ -553,7 +553,7 @@ free_sa_record:
+ 			 sizeof(*sa_record), DMA_TO_DEVICE);
+ free_sa_state:
+ 	dma_unmap_single(eip93->dev, rctx->sa_state_base,
+-			 sizeof(*sa_state), DMA_TO_DEVICE);
++			 sizeof(*sa_state), DMA_BIDIRECTIONAL);
+ 
+ 	return ret;
+ }
