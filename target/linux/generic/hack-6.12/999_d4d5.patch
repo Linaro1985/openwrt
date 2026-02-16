@@ -1,0 +1,42 @@
+--- a/drivers/crypto/inside-secure/eip93/eip93-common.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-common.c
+@@ -292,21 +292,34 @@ int check_valid_request(struct eip93_cip
+ 	if (!dst_align) {
+ 		err = eip93_make_sg_copy(dst, &rctx->sg_dst, copy_len, false);
+ 		if (err)
+-			return err;
++			goto free_src;
+ 	}
+ 
+ 	src_nents = sg_nents_for_len(rctx->sg_src, totlen_src);
+-	if (src_nents < 0)
+-		return src_nents;
++	if (src_nents < 0) {
++		err = src_nents;
++		goto free_dst;
++	}
+ 
+ 	dst_nents = sg_nents_for_len(rctx->sg_dst, totlen_dst);
+-	if (dst_nents < 0)
+-		return dst_nents;
++	if (dst_nents < 0) {
++		err = dst_nents;
++		goto free_dst;
++	}
+ 
+ 	rctx->src_nents = src_nents;
+ 	rctx->dst_nents = dst_nents;
+ 
+ 	return 0;
++
++free_dst:
++	if (rctx->sg_dst != dst)
++		eip93_free_sg_copy(copy_len, &rctx->sg_dst);
++free_src:
++	if (rctx->sg_src != src)
++		eip93_free_sg_copy(copy_len, &rctx->sg_src);
++
++	return err;
+ }
+ 
+ /*
