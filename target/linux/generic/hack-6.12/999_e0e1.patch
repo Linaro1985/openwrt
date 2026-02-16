@@ -1,0 +1,27 @@
+--- a/drivers/crypto/inside-secure/eip93/eip93-aead.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-aead.c
+@@ -37,6 +37,12 @@ void eip93_aead_handle_result(struct cry
+ 	eip93_unmap_dma(eip93, rctx, req->src, req->dst);
+ 	eip93_handle_result(eip93, rctx, req->iv);
+ 
++	if (err == EIP93_HW_ERR_AUTH_FAILED)
++		err = -EBADMSG;
++	/* let software handle anti-replay errors */
++	if (err == EIP93_HW_ERR_REPLAY)
++		err = 0;
++
+ 	aead_request_complete(req, err);
+ }
+ 
+--- a/drivers/crypto/inside-secure/eip93/eip93-main.h
++++ b/drivers/crypto/inside-secure/eip93/eip93-main.h
+@@ -14,6 +14,9 @@
+ #include <linux/bitfield.h>
+ #include <linux/interrupt.h>
+ 
++#define EIP93_HW_ERR_AUTH_FAILED	1 /* Authentication/integrity check failed */
++#define EIP93_HW_ERR_REPLAY		4 /* Anti-replay check error */
++
+ #define EIP93_RING_BUSY_DELAY		500
+ 
+ #define EIP93_RING_NUM			512
