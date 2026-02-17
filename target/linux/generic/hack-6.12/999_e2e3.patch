@@ -1,0 +1,58 @@
+--- a/drivers/crypto/inside-secure/eip93/eip93-aead.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-aead.c
+@@ -290,8 +290,7 @@ static int eip93_aead_encrypt(struct aea
+ 	struct eip93_crypto_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
+ 	struct eip93_cipher_reqctx *rctx = aead_request_ctx(req);
+ 
+-	rctx->flags = ctx->flags;
+-	rctx->flags |= EIP93_ENCRYPT;
++	rctx->flags = ctx->flags | EIP93_ENCRYPT;
+ 	if (ctx->set_assoc_out) {
+ 		eip93_aead_setassoc(ctx, req, false);
+ 		ctx->set_assoc_out = false;
+@@ -312,8 +311,7 @@ static int eip93_aead_decrypt(struct aea
+ 	struct eip93_crypto_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
+ 	struct eip93_cipher_reqctx *rctx = aead_request_ctx(req);
+ 
+-	rctx->flags = ctx->flags;
+-	rctx->flags |= EIP93_DECRYPT;
++	rctx->flags = ctx->flags | EIP93_DECRYPT;
+ 	if (ctx->set_assoc_in) {
+ 		eip93_aead_setassoc(ctx, req, true);
+ 		ctx->set_assoc_in = false;
+--- a/drivers/crypto/inside-secure/eip93/eip93-cipher.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-cipher.c
+@@ -74,6 +74,7 @@ static int eip93_skcipher_cra_init(struc
+ 				    crypto_skcipher_reqsize(ctx->fallback) : 0));
+ 
+ 	ctx->eip93 = tmpl->eip93;
++	ctx->flags = tmpl->flags;
+ 	ctx->type = tmpl->type;
+ 
+ 	ctx->sa_record_in = kzalloc(sizeof(struct sa_record), GFP_KERNEL);
+@@ -257,11 +258,8 @@ static int eip93_skcipher_encrypt(struct
+ {
+ 	struct eip93_crypto_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
+ 	struct eip93_cipher_reqctx *rctx = skcipher_request_ctx(req);
+-	struct eip93_alg_template *tmpl = container_of(req->base.tfm->__crt_alg,
+-				struct eip93_alg_template, alg.skcipher.base);
+ 
+-	rctx->flags = tmpl->flags;
+-	rctx->flags |= EIP93_ENCRYPT;
++	rctx->flags = ctx->flags | EIP93_ENCRYPT;
+ 	rctx->sa_record_base = ctx->sa_record_base_out;
+ 
+ 	return eip93_skcipher_crypt(req, true);
+@@ -271,11 +269,8 @@ static int eip93_skcipher_decrypt(struct
+ {
+ 	struct eip93_crypto_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
+ 	struct eip93_cipher_reqctx *rctx = skcipher_request_ctx(req);
+-	struct eip93_alg_template *tmpl = container_of(req->base.tfm->__crt_alg,
+-				struct eip93_alg_template, alg.skcipher.base);
+ 
+-	rctx->flags = tmpl->flags;
+-	rctx->flags |= EIP93_DECRYPT;
++	rctx->flags = ctx->flags | EIP93_DECRYPT;
+ 	rctx->sa_record_base = ctx->sa_record_base_in;
+ 
+ 	return eip93_skcipher_crypt(req, false);
