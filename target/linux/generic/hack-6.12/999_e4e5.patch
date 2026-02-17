@@ -1,0 +1,30 @@
+--- a/drivers/crypto/inside-secure/eip93/eip93-aead.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-aead.c
+@@ -74,7 +74,6 @@ static int eip93_aead_cra_init(struct cr
+ 
+ 	ctx->eip93 = tmpl->eip93;
+ 	ctx->flags = tmpl->flags;
+-	ctx->type = tmpl->type;
+ 	ctx->set_assoc_in = true;
+ 	ctx->set_assoc_out = true;
+ 
+--- a/drivers/crypto/inside-secure/eip93/eip93-cipher.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-cipher.c
+@@ -75,7 +75,6 @@ static int eip93_skcipher_cra_init(struc
+ 
+ 	ctx->eip93 = tmpl->eip93;
+ 	ctx->flags = tmpl->flags;
+-	ctx->type = tmpl->type;
+ 
+ 	ctx->sa_record_in = kzalloc(sizeof(struct sa_record), GFP_KERNEL);
+ 	if (!ctx->sa_record_in)
+--- a/drivers/crypto/inside-secure/eip93/eip93-cipher.h
++++ b/drivers/crypto/inside-secure/eip93/eip93-cipher.h
+@@ -25,7 +25,6 @@ struct eip93_crypto_ctx {
+ 	unsigned int			assoclen_out;
+ 	bool				set_assoc_in;
+ 	bool				set_assoc_out;
+-	enum eip93_alg_type		type;
+ 	struct crypto_skcipher		*fallback;
+ };
+ 
