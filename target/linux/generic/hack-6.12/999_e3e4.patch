@@ -1,0 +1,62 @@
+--- a/drivers/crypto/inside-secure/eip93/eip93-cipher.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-cipher.c
+@@ -134,19 +134,15 @@ static int eip93_skcipher_setkey(struct
+ {
+ 	struct crypto_tfm *tfm = crypto_skcipher_tfm(ctfm);
+ 	struct eip93_crypto_ctx *ctx = crypto_tfm_ctx(tfm);
+-	struct eip93_alg_template *tmpl = container_of(tfm->__crt_alg,
+-						     struct eip93_alg_template,
+-						     alg.skcipher.base);
+ 	struct sa_record *sa_record = ctx->sa_record_out;
+ 	unsigned int keylen = len;
+-	u32 flags = tmpl->flags;
+ 	u32 nonce = 0;
+ 	int ret;
+ 
+ 	if (!key || !keylen)
+ 		return -EINVAL;
+ 
+-	if (IS_RFC3686(flags)) {
++	if (IS_RFC3686(ctx->flags)) {
+ 		if (len < CTR_RFC3686_NONCE_SIZE)
+ 			return -EINVAL;
+ 
+@@ -154,24 +150,24 @@ static int eip93_skcipher_setkey(struct
+ 		memcpy(&nonce, key + keylen, CTR_RFC3686_NONCE_SIZE);
+ 	}
+ 
+-	if (flags & EIP93_ALG_DES) {
++	if (ctx->flags & EIP93_ALG_DES) {
+ 		ctx->blksize = DES_BLOCK_SIZE;
+ 		ret = verify_skcipher_des_key(ctfm, key);
+ 		if (ret)
+ 			return ret;
+ 	}
+-	if (flags & EIP93_ALG_3DES) {
++	if (ctx->flags & EIP93_ALG_3DES) {
+ 		ctx->blksize = DES3_EDE_BLOCK_SIZE;
+ 		ret = verify_skcipher_des3_key(ctfm, key);
+ 		if (ret)
+ 			return ret;
+ 	}
+ 
+-	if (flags & EIP93_ALG_AES) {
++	if (ctx->flags & EIP93_ALG_AES) {
+ 		struct crypto_aes_ctx aes;
+-		bool fallback = eip93_skcipher_is_fallback(tfm, flags);
++		bool fallback = eip93_skcipher_is_fallback(tfm, ctx->flags);
+ 
+-		if (fallback && !IS_RFC3686(flags)) {
++		if (fallback && !IS_RFC3686(ctx->flags)) {
+ 			ret = crypto_skcipher_setkey(ctx->fallback, key,
+ 						     keylen);
+ 			if (ret)
+@@ -189,7 +185,7 @@ static int eip93_skcipher_setkey(struct
+ 	dma_sync_single_for_cpu(ctx->eip93->dev, ctx->sa_record_base_in,
+ 				sizeof(struct sa_record), DMA_TO_DEVICE);
+ 
+-	eip93_set_sa_record(sa_record, keylen, flags);
++	eip93_set_sa_record(sa_record, keylen, ctx->flags);
+ 
+ 	memcpy(sa_record->sa_key, key, keylen);
+ 	ctx->sa_nonce = nonce;
