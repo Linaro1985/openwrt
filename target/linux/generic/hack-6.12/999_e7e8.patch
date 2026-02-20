@@ -1,0 +1,29 @@
+--- a/drivers/crypto/inside-secure/eip93/eip93-aead.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-aead.c
+@@ -160,6 +160,7 @@ static int eip93_aead_setkey(struct cryp
+ 		break;
+ 	case EIP93_ALG_AES:
+ 		ret = aes_expandkey(&aes, keys.enckey, keys.enckeylen);
++		memzero_explicit(&aes, sizeof(aes));
+ 	}
+ 	if (ret)
+ 		return ret;
+@@ -200,6 +201,8 @@ static int eip93_aead_setkey(struct cryp
+ 	dma_sync_single_for_device(ctx->eip93->dev, ctx->sa_record_base_in,
+ 				   sizeof(struct sa_record), DMA_TO_DEVICE);
+ 
++	memzero_explicit(&keys, sizeof(keys));
++
+ 	ctx->set_assoc_in = true;
+ 	ctx->set_assoc_out = true;
+ 
+--- a/drivers/crypto/inside-secure/eip93/eip93-cipher.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-cipher.c
+@@ -175,6 +175,7 @@ static int eip93_skcipher_setkey(struct
+ 
+ 		ctx->blksize = AES_BLOCK_SIZE;
+ 		ret = aes_expandkey(&aes, key, keylen);
++		memzero_explicit(&aes, sizeof(aes));
+ 		if (ret)
+ 			return ret;
+ 		break;
