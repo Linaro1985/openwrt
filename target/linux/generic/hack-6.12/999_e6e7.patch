@@ -1,0 +1,56 @@
+--- a/drivers/crypto/inside-secure/eip93/eip93-cipher.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-cipher.c
+@@ -149,20 +149,20 @@ static int eip93_skcipher_setkey(struct
+ 		memcpy(&nonce, key + keylen, CTR_RFC3686_NONCE_SIZE);
+ 	}
+ 
+-	if (ctx->flags & EIP93_ALG_DES) {
++	switch (ctx->flags & EIP93_ALG_MASK) {
++	case EIP93_ALG_DES:
+ 		ctx->blksize = DES_BLOCK_SIZE;
+ 		ret = verify_skcipher_des_key(ctfm, key);
+ 		if (ret)
+ 			return ret;
+-	}
+-	if (ctx->flags & EIP93_ALG_3DES) {
++		break;
++	case EIP93_ALG_3DES:
+ 		ctx->blksize = DES3_EDE_BLOCK_SIZE;
+ 		ret = verify_skcipher_des3_key(ctfm, key);
+ 		if (ret)
+ 			return ret;
+-	}
+-
+-	if (ctx->flags & EIP93_ALG_AES) {
++		break;
++	case EIP93_ALG_AES: {
+ 		struct crypto_aes_ctx aes;
+ 		bool fallback = eip93_skcipher_is_fallback(tfm, ctx->flags);
+ 
+@@ -177,6 +177,12 @@ static int eip93_skcipher_setkey(struct
+ 		ret = aes_expandkey(&aes, key, keylen);
+ 		if (ret)
+ 			return ret;
++		break;
++	}
++	default:
++		dev_err(ctx->eip93->dev, "Unknown cipher algorithm: 0x%x\n",
++			(unsigned int)(ctx->flags & EIP93_ALG_MASK));
++		return -EINVAL;
+ 	}
+ 
+ 	dma_sync_single_for_cpu(ctx->eip93->dev, ctx->sa_record_base_out,
+--- a/drivers/crypto/inside-secure/eip93/eip93-main.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-main.c
+@@ -79,6 +79,11 @@ inline void eip93_irq_clear(struct eip93
+ 
+ static int eip93_algo_is_supported(u32 alg_flags, u32 supported_algo_flags)
+ {
++	u32 alg_bits = alg_flags & EIP93_ALG_MASK;
++	if (alg_bits != 0 && alg_bits != EIP93_ALG_DES &&
++	    alg_bits != EIP93_ALG_3DES && alg_bits != EIP93_ALG_AES)
++		return 0;
++
+ 	if ((IS_DES(alg_flags) || IS_3DES(alg_flags)) &&
+ 	    !(supported_algo_flags & EIP93_PE_OPTION_TDES))
+ 		return 0;
