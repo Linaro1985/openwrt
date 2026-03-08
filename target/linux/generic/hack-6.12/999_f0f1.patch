@@ -1,0 +1,30 @@
+--- a/drivers/crypto/inside-secure/eip93/eip93-cipher.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-cipher.c
+@@ -149,6 +149,8 @@ static int eip93_skcipher_setkey(struct
+ 		memcpy(&nonce, key + keylen, CTR_RFC3686_NONCE_SIZE);
+ 	}
+ 
++	ctx->keylen = keylen;
++
+ 	switch (ctx->flags & EIP93_ALG_MASK) {
+ 	case EIP93_ALG_DES:
+ 		ctx->blksize = DES_BLOCK_SIZE;
+@@ -231,7 +233,7 @@ static int eip93_skcipher_crypt(struct s
+ 			return -EINVAL;
+ 
+ 	if (fallback &&
+-	    req->cryptlen <= (AES_KEYSIZE_128 ?
++	    req->cryptlen <= ((ctx->keylen == AES_KEYSIZE_128) ?
+ 			      CONFIG_CRYPTO_DEV_EIP93_AES_128_SW_MAX_LEN :
+ 			      CONFIG_CRYPTO_DEV_EIP93_GENERIC_SW_MAX_LEN)) {
+ 		skcipher_request_set_tfm(&rctx->fallback_req, ctx->fallback);
+--- a/drivers/crypto/inside-secure/eip93/eip93-cipher.h
++++ b/drivers/crypto/inside-secure/eip93/eip93-cipher.h
+@@ -26,6 +26,7 @@ struct eip93_crypto_ctx {
+ 	bool				set_assoc_in;
+ 	bool				set_assoc_out;
+ 	struct crypto_skcipher		*fallback;
++	u32				keylen;
+ };
+ 
+ struct eip93_cipher_reqctx {
