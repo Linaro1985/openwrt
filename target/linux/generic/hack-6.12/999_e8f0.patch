@@ -1,0 +1,339 @@
+--- a/drivers/crypto/inside-secure/eip93/eip93-cipher.h
++++ b/drivers/crypto/inside-secure/eip93/eip93-cipher.h
+@@ -47,6 +47,9 @@ struct eip93_cipher_reqctx {
+ 	struct sa_state			*sa_state_ctr;
+ 	dma_addr_t			sa_state_ctr_base;
+ 	struct skcipher_request		fallback_req;
++	/* Pool management */
++	int				sa_state_idx;		/* -1 if from slab */
++	int				sa_state_ctr_idx;	/* -1 if from slab */
+ };
+ 
+ int check_valid_request(struct eip93_cipher_reqctx *rctx);
+--- a/drivers/crypto/inside-secure/eip93/eip93-common.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-common.c
+@@ -403,6 +403,90 @@ void eip93_set_sa_record(struct sa_recor
+ }
+ 
+ /*
++ * Fast pool allocation with slab fallback
++ * Returns: 0 on success, -errno on failure
++ */
++static int eip93_sa_state_alloc(struct eip93_device *eip93,
++				struct eip93_cipher_reqctx *rctx,
++				bool is_ctr)
++{
++	struct eip93_ring *ring = eip93->ring;
++	struct sa_state **state_ptr = is_ctr ? &rctx->sa_state_ctr : &rctx->sa_state;
++	dma_addr_t *dma_ptr = is_ctr ? &rctx->sa_state_ctr_base : &rctx->sa_state_base;
++	int *idx_ptr = is_ctr ? &rctx->sa_state_ctr_idx : &rctx->sa_state_idx;
++	struct kmem_cache *cache = is_ctr ? ring->sa_state_ctr_cache : ring->sa_state_cache;
++	unsigned long flags;
++	int idx;
++
++	*idx_ptr = -1;  /* default: from slab */
++
++	/* Fast path: try pre-allocated pool */
++	if (likely(ring->sa_state_pool)) {
++		spin_lock_irqsave(&ring->sa_state_lock, flags);
++		/* Find first available entry (skip reserved area) */
++		idx = find_next_zero_bit(ring->sa_state_bitmap,
++					 EIP93_SA_STATE_BITMAP_BITS,
++					 EIP93_SA_STATE_RESERVE);
++		if (idx < EIP93_SA_STATE_BITMAP_BITS) {
++			__set_bit(idx, ring->sa_state_bitmap);
++			spin_unlock_irqrestore(&ring->sa_state_lock, flags);
++
++			*state_ptr = ring->sa_state_pool + idx;
++			*dma_ptr = ring->sa_state_pool_dma +
++				   idx * sizeof(struct sa_state);
++			*idx_ptr = idx;
++			return 0;
++		}
++		spin_unlock_irqrestore(&ring->sa_state_lock, flags);
++	}
++
++	/* Slow path: slab allocation + DMA mapping */
++	*state_ptr = kmem_cache_alloc(cache, GFP_KERNEL);
++	if (!*state_ptr)
++		return -ENOMEM;
++
++	*dma_ptr = dma_map_single(eip93->dev, *state_ptr,
++				  sizeof(struct sa_state),
++				  DMA_BIDIRECTIONAL);
++	if (dma_mapping_error(eip93->dev, *dma_ptr)) {
++		kmem_cache_free(cache, *state_ptr);
++		*state_ptr = NULL;
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
++static void eip93_sa_state_free(struct eip93_device *eip93,
++				struct eip93_cipher_reqctx *rctx,
++				bool is_ctr)
++{
++	struct eip93_ring *ring = eip93->ring;
++	struct sa_state *state = is_ctr ? rctx->sa_state_ctr : rctx->sa_state;
++	dma_addr_t dma = is_ctr ? rctx->sa_state_ctr_base : rctx->sa_state_base;
++	int idx = is_ctr ? rctx->sa_state_ctr_idx : rctx->sa_state_idx;
++	struct kmem_cache *cache = is_ctr ? ring->sa_state_ctr_cache : ring->sa_state_cache;
++	unsigned long flags;
++
++	if (!state)
++		return;
++
++	if (idx >= 0) {
++		/* Fast path: return to pool */
++		dma_unmap_single(eip93->dev, dma, sizeof(struct sa_state),
++				 DMA_BIDIRECTIONAL);
++		spin_lock_irqsave(&ring->sa_state_lock, flags);
++		__clear_bit(idx, ring->sa_state_bitmap);
++		spin_unlock_irqrestore(&ring->sa_state_lock, flags);
++	} else {
++		/* Slow path: free slab */
++		dma_unmap_single(eip93->dev, dma, sizeof(struct sa_state),
++				 DMA_BIDIRECTIONAL);
++		kmem_cache_free(cache, state);
++	}
++}
++
++/*
+  * Poor mans Scatter/gather function:
+  * Create a Descriptor for every segment to avoid copying buffers.
+  * For performance better to wait for hardware to perform multiple DMA
+@@ -556,15 +640,17 @@ int eip93_send_req(struct crypto_async_r
+ 
+ 	rctx->sa_state_ctr = NULL;
+ 	rctx->sa_state = NULL;
++	rctx->sa_state_idx = -1;
++	rctx->sa_state_ctr_idx = -1;
+ 
+ 	if (IS_ECB(flags))
+ 		goto skip_iv;
+ 
+ 	memcpy(iv, reqiv, rctx->ivsize);
+ 
+-	rctx->sa_state = kzalloc(sizeof(*rctx->sa_state), GFP_KERNEL);
+-	if (!rctx->sa_state)
+-		return -ENOMEM;
++	err = eip93_sa_state_alloc(eip93, rctx, false);
++	if (err)
++		return err;
+ 
+ 	sa_state = rctx->sa_state;
+ 
+@@ -590,33 +676,16 @@ int eip93_send_req(struct crypto_async_r
+ 			iv[3] = 0xffffffff;
+ 			crypto_inc((u8 *)iv, AES_BLOCK_SIZE);
+ 
+-			rctx->sa_state_ctr = kzalloc(sizeof(*rctx->sa_state_ctr),
+-						     GFP_KERNEL);
+-			if (!rctx->sa_state_ctr) {
+-				err = -ENOMEM;
+-				goto free_sa_state;
+-			}
++			err = eip93_sa_state_alloc(eip93, rctx, true);
++			if (err)
++				goto free_sa_state_alloc;
+ 
+ 			memcpy(rctx->sa_state_ctr->state_iv, reqiv, rctx->ivsize);
+ 			memcpy(sa_state->state_iv, iv, rctx->ivsize);
+-
+-			rctx->sa_state_ctr_base = dma_map_single(eip93->dev, rctx->sa_state_ctr,
+-								 sizeof(*rctx->sa_state_ctr),
+-								 DMA_BIDIRECTIONAL);
+-			err = dma_mapping_error(eip93->dev, rctx->sa_state_ctr_base);
+-			if (err)
+-				goto free_sa_state_ctr;
+ 		}
+ 	}
+ 
+-	rctx->sa_state_base = dma_map_single(eip93->dev, rctx->sa_state,
+-					     sizeof(*rctx->sa_state), DMA_BIDIRECTIONAL);
+-	err = dma_mapping_error(eip93->dev, rctx->sa_state_base);
+-	if (err)
+-		goto free_sa_state_ctr_dma;
+-
+ skip_iv:
+-
+ 	cdesc.pe_ctrl_stat_word = FIELD_PREP(EIP93_PE_CTRL_PE_READY_DES_TRING_OWN,
+ 					     EIP93_PE_CTRL_HOST_READY);
+ 	cdesc.sa_addr = rctx->sa_record_base;
+@@ -636,7 +705,7 @@ skip_iv:
+ 	 */
+ 	if (!dma_map_sg(eip93->dev, dst, rctx->dst_nents, DMA_BIDIRECTIONAL)) {
+ 		err = -ENOMEM;
+-		goto free_sa_state_ctr_dma;
++		goto free_sa_state_alloc;
+ 	}
+ 
+ 	if (src != dst &&
+@@ -649,19 +718,9 @@ skip_iv:
+ 
+ free_sg_dma:
+ 	dma_unmap_sg(eip93->dev, dst, rctx->dst_nents, DMA_BIDIRECTIONAL);
+-free_sa_state_ctr_dma:
+-	if (rctx->sa_state_ctr)
+-		dma_unmap_single(eip93->dev, rctx->sa_state_ctr_base,
+-				 sizeof(*rctx->sa_state_ctr),
+-				 DMA_BIDIRECTIONAL);
+-free_sa_state_ctr:
+-	kfree(rctx->sa_state_ctr);
+-	if (rctx->sa_state)
+-		dma_unmap_single(eip93->dev, rctx->sa_state_base,
+-				 sizeof(*rctx->sa_state),
+-				 DMA_BIDIRECTIONAL);
+-free_sa_state:
+-	kfree(rctx->sa_state);
++free_sa_state_alloc:
++	eip93_sa_state_free(eip93, rctx, true);   /* sa_state_ctr */
++	eip93_sa_state_free(eip93, rctx, false);  /* sa_state */
+ 
+ 	return err;
+ }
+@@ -713,21 +772,12 @@ process_tag:
+ void eip93_handle_result(struct eip93_device *eip93, struct eip93_cipher_reqctx *rctx,
+ 			 u8 *reqiv)
+ {
+-	if (rctx->sa_state_ctr)
+-		dma_unmap_single(eip93->dev, rctx->sa_state_ctr_base,
+-				 sizeof(*rctx->sa_state_ctr),
+-				 DMA_BIDIRECTIONAL);
+-
+-	if (rctx->sa_state)
+-		dma_unmap_single(eip93->dev, rctx->sa_state_base,
+-				 sizeof(*rctx->sa_state),
+-				 DMA_BIDIRECTIONAL);
+-
+ 	if (!IS_ECB(rctx->flags))
+ 		memcpy(reqiv, rctx->sa_state->state_iv, rctx->ivsize);
+ 
+-	kfree(rctx->sa_state_ctr);
+-	kfree(rctx->sa_state);
++	/* Free SA state (pool or slab) */
++	eip93_sa_state_free(eip93, rctx, true);   /* sa_state_ctr */
++	eip93_sa_state_free(eip93, rctx, false);  /* sa_state */
+ }
+ 
+ int eip93_hmac_setkey(u32 ctx_flags, const u8 *key, unsigned int keylen,
+--- a/drivers/crypto/inside-secure/eip93/eip93-main.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-main.c
+@@ -62,6 +62,62 @@ static struct eip93_alg_template *eip93_
+ 	&eip93_alg_hmac_sha256,
+ };
+ 
++static int eip93_sa_state_pool_init(struct eip93_device *eip93)
++{
++	struct eip93_ring *ring = eip93->ring;
++	size_t pool_size;
++	int ret;
++
++	/* Pre-allocated coherent pool for fast path */
++	pool_size = sizeof(struct sa_state) * EIP93_SA_STATE_BITMAP_BITS;
++	ring->sa_state_pool = dmam_alloc_coherent(eip93->dev, pool_size,
++						  &ring->sa_state_pool_dma,
++						  GFP_KERNEL);
++	if (!ring->sa_state_pool)
++		return -ENOMEM;
++
++	ring->sa_state_bitmap = bitmap_zalloc(EIP93_SA_STATE_BITMAP_BITS, GFP_KERNEL);
++	if (!ring->sa_state_bitmap) {
++		dmam_free_coherent(eip93->dev, pool_size, ring->sa_state_pool,
++				   ring->sa_state_pool_dma);
++		ring->sa_state_pool = NULL;
++		return -ENOMEM;
++	}
++
++	/* Reserve first 32 entries for slab fallback / emergency */
++	bitmap_set(ring->sa_state_bitmap, 0, EIP93_SA_STATE_RESERVE);
++
++	spin_lock_init(&ring->sa_state_lock);
++
++	/* Slab caches for slow path */
++	ring->sa_state_cache = kmem_cache_create("eip93_sa_state",
++						 sizeof(struct sa_state),
++						 0, SLAB_HWCACHE_ALIGN, NULL);
++	if (!ring->sa_state_cache) {
++		ret = -ENOMEM;
++		goto err_free_bitmap;
++	}
++
++	ring->sa_state_ctr_cache = kmem_cache_create("eip93_sa_state_ctr",
++						     sizeof(struct sa_state),
++						     0, SLAB_HWCACHE_ALIGN, NULL);
++	if (!ring->sa_state_ctr_cache) {
++		ret = -ENOMEM;
++		goto err_free_slab;
++	}
++
++	return 0;
++
++err_free_slab:
++	kmem_cache_destroy(ring->sa_state_cache);
++err_free_bitmap:
++	bitmap_free(ring->sa_state_bitmap);
++	dmam_free_coherent(eip93->dev, pool_size, ring->sa_state_pool,
++			   ring->sa_state_pool_dma);
++	ring->sa_state_pool = NULL;
++	return ret;
++}
++
+ inline void eip93_irq_disable(struct eip93_device *eip93, u32 mask)
+ {
+ 	__raw_writel(mask, eip93->base + EIP93_REG_MASK_DISABLE);
+@@ -394,6 +450,10 @@ static int eip93_desc_init(struct eip93_
+ 	val = FIELD_PREP(EIP93_PE_RING_SIZE, EIP93_RING_NUM - 1);
+ 	writel(val, eip93->base + EIP93_REG_PE_RING_CONFIG);
+ 
++	ret = eip93_sa_state_pool_init(eip93);
++	if (ret)
++		return ret;
++
+ 	return 0;
+ }
+ 
+@@ -405,6 +465,14 @@ static void eip93_cleanup(struct eip93_d
+ 	eip93_irq_clear(eip93, EIP93_INT_ALL);
+ 	eip93_irq_disable(eip93, EIP93_INT_ALL);
+ 
++	if (eip93->ring->sa_state_ctr_cache)
++		kmem_cache_destroy(eip93->ring->sa_state_ctr_cache);
++	if (eip93->ring->sa_state_cache)
++		kmem_cache_destroy(eip93->ring->sa_state_cache);
++	if (eip93->ring->sa_state_bitmap)
++		bitmap_free(eip93->ring->sa_state_bitmap);
++	/* sa_state_pool freed by dmam_ automatically */
++
+ 	writel(0, eip93->base + EIP93_REG_PE_CLOCK_CTRL);
+ 
+ 	eip93_desc_free(eip93);
+--- a/drivers/crypto/inside-secure/eip93/eip93-main.h
++++ b/drivers/crypto/inside-secure/eip93/eip93-main.h
+@@ -23,6 +23,10 @@
+ #define EIP93_RING_BUSY			32
+ #define EIP93_CRA_PRIORITY		1500
+ 
++#define EIP93_SA_STATE_POOL_SIZE	256
++#define EIP93_SA_STATE_RESERVE		32
++#define EIP93_SA_STATE_BITMAP_BITS	(EIP93_SA_STATE_POOL_SIZE + EIP93_SA_STATE_RESERVE)
++
+ #define EIP93_RING_SA_STATE_ADDR(base, idx)	((base) + (idx))
+ #define EIP93_RING_SA_STATE_DMA(dma_base, idx)	((u32 __force)(dma_base) + \
+ 						 ((idx) * sizeof(struct sa_state)))
+@@ -132,6 +136,14 @@ struct eip93_ring {
+ 	/* aync idr */
+ 	spinlock_t			idr_lock;
+ 	struct idr			crypto_async_idr;
++	/* SA state pool - fast path */
++	struct sa_state			*sa_state_pool;
++	dma_addr_t			sa_state_pool_dma;
++	unsigned long			*sa_state_bitmap;
++	spinlock_t			sa_state_lock;
++	/* Slab cache - slow path fallback */
++	struct kmem_cache		*sa_state_cache;
++	struct kmem_cache		*sa_state_ctr_cache;
+ };
+ 
+ enum eip93_alg_type {
