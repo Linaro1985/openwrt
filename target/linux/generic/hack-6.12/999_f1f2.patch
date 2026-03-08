@@ -1,0 +1,212 @@
+--- a/drivers/crypto/inside-secure/eip93/eip93-common.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-common.c
+@@ -636,7 +636,8 @@ int eip93_send_req(struct crypto_async_r
+ 	u32 split = datalen;
+ 	u32 start, end, ctr, blocks;
+ 	u32 iv[AES_BLOCK_SIZE / sizeof(u32)];
+-	int crypto_async_idr;
++	unsigned long irqflags;
++	u16 slot;
+ 
+ 	rctx->sa_state_ctr = NULL;
+ 	rctx->sa_state = NULL;
+@@ -691,11 +692,18 @@ skip_iv:
+ 	cdesc.sa_addr = rctx->sa_record_base;
+ 	cdesc.arc4_addr = 0;
+ 
+-	scoped_guard(spinlock_bh, &eip93->ring->idr_lock)
+-		crypto_async_idr = idr_alloc(&eip93->ring->crypto_async_idr, async, 0,
+-					     EIP93_RING_NUM - 1, GFP_ATOMIC);
++	spin_lock_irqsave(&eip93->ring->ctx_tab_lock, irqflags);
++	slot = find_first_zero_bit(eip93->ring->ctx_tab_bitmap, MAX_CTX_SLOT);
++	if (slot == MAX_CTX_SLOT) {
++		spin_unlock_irqrestore(&eip93->ring->ctx_tab_lock, irqflags);
++		err = -EBUSY;
++		goto free_sa_state_alloc;
++	}
++	set_bit(slot, eip93->ring->ctx_tab_bitmap);
++	eip93->ring->ctx_tab[slot] = async;
++	spin_unlock_irqrestore(&eip93->ring->ctx_tab_lock, irqflags);
+ 
+-	cdesc.user_id = FIELD_PREP(EIP93_PE_USER_ID_CRYPTO_IDR, (u16)crypto_async_idr) |
++	cdesc.user_id = FIELD_PREP(EIP93_PE_USER_ID_CRYPTO_SLOT, (u16)slot) |
+ 			FIELD_PREP(EIP93_PE_USER_ID_DESC_FLAGS, rctx->desc_flags);
+ 
+ 	rctx->cdesc = &cdesc;
+--- a/drivers/crypto/inside-secure/eip93/eip93-hash.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-hash.c
+@@ -216,6 +216,8 @@ static int eip93_send_hash_req(struct cr
+ 	struct eip93_descriptor cdesc = { };
+ 	dma_addr_t src_addr;
+ 	int ret;
++	unsigned long irqflags;
++	u16 slot;
+ 
+ 	/* Map block data to DMA */
+ 	src_addr = dma_map_single(eip93->dev, data, len, DMA_TO_DEVICE);
+@@ -238,8 +240,6 @@ static int eip93_send_hash_req(struct cr
+ 	cdesc.user_id |= FIELD_PREP(EIP93_PE_USER_ID_DESC_FLAGS, EIP93_DESC_HASH);
+ 
+ 	if (last) {
+-		int crypto_async_idr;
+-
+ 		if (rctx->finalize && !rctx->partial_hash) {
+ 			/* For last block, pass sa_record with CMD_HMAC enabled */
+ 			if (IS_HMAC(ctx->flags)) {
+@@ -251,7 +251,7 @@ static int eip93_send_hash_req(struct cr
+ 									   DMA_TO_DEVICE);
+ 				ret = dma_mapping_error(eip93->dev, rctx->sa_record_hmac_base);
+ 				if (ret)
+-					return ret;
++					goto err_unmap_src;
+ 
+ 				cdesc.sa_addr = rctx->sa_record_hmac_base;
+ 			}
+@@ -259,11 +259,18 @@ static int eip93_send_hash_req(struct cr
+ 			cdesc.pe_ctrl_stat_word |= EIP93_PE_CTRL_PE_HASH_FINAL;
+ 		}
+ 
+-		scoped_guard(spinlock_bh, &eip93->ring->idr_lock)
+-			crypto_async_idr = idr_alloc(&eip93->ring->crypto_async_idr, async, 0,
+-						     EIP93_RING_NUM - 1, GFP_ATOMIC);
++		spin_lock_irqsave(&eip93->ring->ctx_tab_lock, irqflags);
++		slot = find_first_zero_bit(eip93->ring->ctx_tab_bitmap, MAX_CTX_SLOT);
++		if (slot == MAX_CTX_SLOT) {
++			spin_unlock_irqrestore(&eip93->ring->ctx_tab_lock, irqflags);
++			ret = -EBUSY;
++			goto err_unmap_src;
++		}
++		set_bit(slot, eip93->ring->ctx_tab_bitmap);
++		eip93->ring->ctx_tab[slot] = async;
++		spin_unlock_irqrestore(&eip93->ring->ctx_tab_lock, irqflags);
+ 
+-		cdesc.user_id |= FIELD_PREP(EIP93_PE_USER_ID_CRYPTO_IDR, (u16)crypto_async_idr) |
++		cdesc.user_id |= FIELD_PREP(EIP93_PE_USER_ID_CRYPTO_SLOT, (u16)slot) |
+ 				 FIELD_PREP(EIP93_PE_USER_ID_DESC_FLAGS, EIP93_DESC_LAST);
+ 	}
+ 
+@@ -280,6 +287,10 @@ again:
+ 
+ 	*data_dma = src_addr;
+ 	return 0;
++
++err_unmap_src:
++	dma_unmap_single(eip93->dev, src_addr, len, DMA_TO_DEVICE);
++	return ret;
+ }
+ 
+ static int eip93_hash_init(struct ahash_request *req)
+--- a/drivers/crypto/inside-secure/eip93/eip93-main.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-main.c
+@@ -248,11 +248,12 @@ static void eip93_handle_result_descript
+ {
+ 	struct crypto_async_request *async;
+ 	struct eip93_descriptor *rdesc;
+-	u16 desc_flags, crypto_idr;
++	u16 desc_flags, slot;
+ 	bool last_entry;
+ 	int handled, left, err;
+ 	u32 pe_ctrl_stat;
+ 	u32 pe_length;
++	unsigned long irqflags;
+ 
+ get_more:
+ 	handled = 0;
+@@ -291,7 +292,7 @@ get_more:
+ 						  EIP93_PE_CTRL_PE_AUTH_ERR);
+ 
+ 		desc_flags = FIELD_GET(EIP93_PE_USER_ID_DESC_FLAGS, rdesc->user_id);
+-		crypto_idr = FIELD_GET(EIP93_PE_USER_ID_CRYPTO_IDR, rdesc->user_id);
++		slot = FIELD_GET(EIP93_PE_USER_ID_CRYPTO_SLOT, rdesc->user_id);
+ 
+ 		writel(1, eip93->base + EIP93_REG_PE_RD_COUNT);
+ 		eip93_irq_clear(eip93, EIP93_INT_RDR_THRESH);
+@@ -309,10 +310,11 @@ get_more:
+ 		goto get_more;
+ 
+ 	/* Get crypto async ref only for last descriptor */
+-	scoped_guard(spinlock_bh, &eip93->ring->idr_lock) {
+-		async = idr_find(&eip93->ring->crypto_async_idr, crypto_idr);
+-		idr_remove(&eip93->ring->crypto_async_idr, crypto_idr);
+-	}
++	spin_lock_irqsave(&eip93->ring->ctx_tab_lock, irqflags);
++	async = eip93->ring->ctx_tab[slot];
++	eip93->ring->ctx_tab[slot] = NULL;
++	clear_bit(slot, eip93->ring->ctx_tab_bitmap);
++	spin_unlock_irqrestore(&eip93->ring->ctx_tab_lock, irqflags);
+ 
+ 	/* Parse error in ctrl stat word */
+ 	err = eip93_parse_ctrl_stat_err(eip93, err);
+@@ -476,8 +478,6 @@ static void eip93_cleanup(struct eip93_d
+ 	writel(0, eip93->base + EIP93_REG_PE_CLOCK_CTRL);
+ 
+ 	eip93_desc_free(eip93);
+-
+-	idr_destroy(&eip93->ring->crypto_async_idr);
+ }
+ 
+ static int eip93_crypto_probe(struct platform_device *pdev)
+@@ -529,8 +529,9 @@ static int eip93_crypto_probe(struct pla
+ 	spin_lock_init(&eip93->ring->read_lock);
+ 	spin_lock_init(&eip93->ring->write_lock);
+ 
+-	spin_lock_init(&eip93->ring->idr_lock);
+-	idr_init(&eip93->ring->crypto_async_idr);
++	spin_lock_init(&eip93->ring->ctx_tab_lock);
++	memset(eip93->ring->ctx_tab, 0, sizeof(eip93->ring->ctx_tab));
++	bitmap_zero(eip93->ring->ctx_tab_bitmap, MAX_CTX_SLOT);
+ 
+ 	algo_flags = readl(eip93->base + EIP93_REG_PE_OPTION_1);
+ 
+--- a/drivers/crypto/inside-secure/eip93/eip93-main.h
++++ b/drivers/crypto/inside-secure/eip93/eip93-main.h
+@@ -14,6 +14,8 @@
+ #include <linux/bitfield.h>
+ #include <linux/interrupt.h>
+ 
++#define MAX_CTX_SLOT			256
++
+ #define EIP93_HW_ERR_AUTH_FAILED	1 /* Authentication/integrity check failed */
+ #define EIP93_HW_ERR_REPLAY		4 /* Anti-replay check error */
+ 
+@@ -23,7 +25,7 @@
+ #define EIP93_RING_BUSY			32
+ #define EIP93_CRA_PRIORITY		1500
+ 
+-#define EIP93_SA_STATE_POOL_SIZE	256
++#define EIP93_SA_STATE_POOL_SIZE	512
+ #define EIP93_SA_STATE_RESERVE		32
+ #define EIP93_SA_STATE_BITMAP_BITS	(EIP93_SA_STATE_POOL_SIZE + EIP93_SA_STATE_RESERVE)
+ 
+@@ -133,9 +135,6 @@ struct eip93_ring {
+ 	struct eip93_desc_ring		rdr;
+ 	spinlock_t			write_lock;
+ 	spinlock_t			read_lock;
+-	/* aync idr */
+-	spinlock_t			idr_lock;
+-	struct idr			crypto_async_idr;
+ 	/* SA state pool - fast path */
+ 	struct sa_state			*sa_state_pool;
+ 	dma_addr_t			sa_state_pool_dma;
+@@ -144,6 +143,10 @@ struct eip93_ring {
+ 	/* Slab cache - slow path fallback */
+ 	struct kmem_cache		*sa_state_cache;
+ 	struct kmem_cache		*sa_state_ctr_cache;
++	/* ctx table */
++	struct crypto_async_request	*ctx_tab[MAX_CTX_SLOT];
++	unsigned long			ctx_tab_bitmap[MAX_CTX_SLOT / BITS_PER_LONG];
++	spinlock_t			ctx_tab_lock;
+ };
+ 
+ enum eip93_alg_type {
+--- a/drivers/crypto/inside-secure/eip93/eip93-regs.h
++++ b/drivers/crypto/inside-secure/eip93/eip93-regs.h
+@@ -54,7 +54,7 @@
+  */
+ #define EIP93_REG_PE_USER_ID			0x18
+ #define   EIP93_PE_USER_ID_DESC_FLAGS		GENMASK(31, 16)
+-#define   EIP93_PE_USER_ID_CRYPTO_IDR		GENMASK(15, 0)
++#define   EIP93_PE_USER_ID_CRYPTO_SLOT		GENMASK(15, 0)
+ #define EIP93_REG_PE_LENGTH			0x1c
+ #define   EIP93_PE_LENGTH_BYPASS		GENMASK(31, 24)
+ #define   EIP93_PE_LENGTH_HOST_PE_READY		GENMASK(23, 22)
