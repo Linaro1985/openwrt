@@ -1,0 +1,127 @@
+--- a/drivers/crypto/inside-secure/eip93/eip93-aead.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-aead.c
+@@ -166,11 +166,10 @@ static int eip93_aead_setkey(struct cryp
+ 		return ret;
+ 
+ 	ctx->blksize = crypto_aead_blocksize(ctfm);
+-	dma_unmap_single(ctx->eip93->dev, ctx->sa_record_base_in,
+-			 sizeof(struct sa_record), DMA_TO_DEVICE);
+-
+-	dma_unmap_single(ctx->eip93->dev, ctx->sa_record_base_out,
+-			 sizeof(struct sa_record), DMA_TO_DEVICE);
++	dma_sync_single_for_cpu(ctx->eip93->dev, ctx->sa_record_base_in,
++				sizeof(struct sa_record), DMA_TO_DEVICE);
++	dma_sync_single_for_cpu(ctx->eip93->dev, ctx->sa_record_base_out,
++				sizeof(struct sa_record), DMA_TO_DEVICE);
+ 	/* Encryption key */
+ 	eip93_set_sa_record(sa_record, keys.enckeylen, ctx->flags);
+ 	sa_record->sa_cmd0_word &= ~EIP93_SA_CMD_OPCODE;
+@@ -197,10 +196,10 @@ static int eip93_aead_setkey(struct cryp
+ 	ctx->sa_record_in->sa_cmd1_word &= ~(EIP93_SA_CMD_COPY_PAD |
+ 					  EIP93_SA_CMD_COPY_DIGEST);
+ 
+-	ctx->sa_record_base_out = dma_map_single(ctx->eip93->dev, sa_record,
+-						 sizeof(struct sa_record), DMA_TO_DEVICE);
+-	ctx->sa_record_base_in = dma_map_single(ctx->eip93->dev, ctx->sa_record_in,
+-						sizeof(struct sa_record), DMA_TO_DEVICE);
++	dma_sync_single_for_device(ctx->eip93->dev, ctx->sa_record_base_out,
++				   sizeof(struct sa_record), DMA_TO_DEVICE);
++	dma_sync_single_for_device(ctx->eip93->dev, ctx->sa_record_base_in,
++				   sizeof(struct sa_record), DMA_TO_DEVICE);
+ 
+ 	memzero_explicit(&keys, sizeof(keys));
+ 
+@@ -216,10 +215,9 @@ static int eip93_aead_setauthsize(struct
+ 	struct crypto_tfm *tfm = crypto_aead_tfm(ctfm);
+ 	struct eip93_crypto_ctx *ctx = crypto_tfm_ctx(tfm);
+ 
+-	dma_unmap_single(ctx->eip93->dev, ctx->sa_record_base_in,
++	dma_sync_single_for_cpu(ctx->eip93->dev, ctx->sa_record_base_in,
+ 				sizeof(struct sa_record), DMA_TO_DEVICE);
+-
+-	dma_unmap_single(ctx->eip93->dev, ctx->sa_record_base_out,
++	dma_sync_single_for_cpu(ctx->eip93->dev, ctx->sa_record_base_out,
+ 				sizeof(struct sa_record), DMA_TO_DEVICE);
+ 
+ 	ctx->authsize = authsize;
+@@ -231,10 +229,10 @@ static int eip93_aead_setauthsize(struct
+ 	ctx->sa_record_out->sa_cmd0_word |= FIELD_PREP(EIP93_SA_CMD_DIGEST_LENGTH,
+ 						   ctx->authsize / sizeof(u32));
+ 
+-	ctx->sa_record_base_out = dma_map_single(ctx->eip93->dev, ctx->sa_record_out,
+-				sizeof(struct sa_record), DMA_TO_DEVICE);
+-	ctx->sa_record_base_in = dma_map_single(ctx->eip93->dev, ctx->sa_record_in,
+-				sizeof(struct sa_record), DMA_TO_DEVICE);
++	dma_sync_single_for_device(ctx->eip93->dev, ctx->sa_record_base_out,
++				   sizeof(struct sa_record), DMA_TO_DEVICE);
++	dma_sync_single_for_device(ctx->eip93->dev, ctx->sa_record_base_in,
++				   sizeof(struct sa_record), DMA_TO_DEVICE);
+ 
+ 	return 0;
+ }
+@@ -245,24 +243,24 @@ static void eip93_aead_setassoc(struct e
+ 	struct sa_record *sa_record;
+ 
+ 	if (in) {
+-		dma_unmap_single(ctx->eip93->dev, ctx->sa_record_base_in,
+-				sizeof(struct sa_record), DMA_TO_DEVICE);
++		dma_sync_single_for_cpu(ctx->eip93->dev, ctx->sa_record_base_in,
++					sizeof(struct sa_record), DMA_TO_DEVICE);
+ 		sa_record = ctx->sa_record_in;
+ 		sa_record->sa_cmd1_word &= ~EIP93_SA_CMD_HASH_CRYPT_OFFSET;
+ 		sa_record->sa_cmd1_word |= FIELD_PREP(EIP93_SA_CMD_HASH_CRYPT_OFFSET,
+ 					      req->assoclen / sizeof(u32));
+-		ctx->sa_record_base_in = dma_map_single(ctx->eip93->dev, sa_record,
+-				sizeof(struct sa_record), DMA_TO_DEVICE);
++		dma_sync_single_for_device(ctx->eip93->dev, ctx->sa_record_base_in,
++					   sizeof(struct sa_record), DMA_TO_DEVICE);
+ 		ctx->assoclen_in = req->assoclen;
+ 	} else {
+-		dma_unmap_single(ctx->eip93->dev, ctx->sa_record_base_out,
+-				sizeof(struct sa_record), DMA_TO_DEVICE);
++		dma_sync_single_for_cpu(ctx->eip93->dev, ctx->sa_record_base_out,
++					sizeof(struct sa_record), DMA_TO_DEVICE);
+ 		sa_record = ctx->sa_record_out;
+ 		sa_record->sa_cmd1_word &= ~EIP93_SA_CMD_HASH_CRYPT_OFFSET;
+ 		sa_record->sa_cmd1_word |= FIELD_PREP(EIP93_SA_CMD_HASH_CRYPT_OFFSET,
+ 					      req->assoclen / sizeof(u32));
+-		ctx->sa_record_base_out = dma_map_single(ctx->eip93->dev, sa_record,
+-			sizeof(struct sa_record), DMA_TO_DEVICE);
++		dma_sync_single_for_device(ctx->eip93->dev, ctx->sa_record_base_out,
++					   sizeof(struct sa_record), DMA_TO_DEVICE);
+ 		ctx->assoclen_out = req->assoclen;
+ 	}
+ }
+--- a/drivers/crypto/inside-secure/eip93/eip93-cipher.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-cipher.c
+@@ -188,11 +188,10 @@ static int eip93_skcipher_setkey(struct
+ 		return -EINVAL;
+ 	}
+ 
+-	dma_unmap_single(ctx->eip93->dev, ctx->sa_record_base_in,
+-			 sizeof(struct sa_record), DMA_TO_DEVICE);
+-
+-	dma_unmap_single(ctx->eip93->dev, ctx->sa_record_base_out,
+-			 sizeof(struct sa_record), DMA_TO_DEVICE);
++	dma_sync_single_for_cpu(ctx->eip93->dev, ctx->sa_record_base_out,
++				sizeof(struct sa_record), DMA_TO_DEVICE);
++	dma_sync_single_for_cpu(ctx->eip93->dev, ctx->sa_record_base_in,
++				sizeof(struct sa_record), DMA_TO_DEVICE);
+ 
+ 	eip93_set_sa_record(sa_record, keylen, ctx->flags);
+ 
+@@ -204,10 +203,10 @@ static int eip93_skcipher_setkey(struct
+ 	memcpy(ctx->sa_record_in, sa_record, sizeof(struct sa_record));
+ 	ctx->sa_record_in->sa_cmd0_word |= EIP93_SA_CMD_DIRECTION_IN;
+ 
+-	ctx->sa_record_base_out = dma_map_single(ctx->eip93->dev, sa_record,
+-						 sizeof(struct sa_record), DMA_TO_DEVICE);
+-	ctx->sa_record_base_in = dma_map_single(ctx->eip93->dev, ctx->sa_record_in,
+-						sizeof(struct sa_record), DMA_TO_DEVICE);
++	dma_sync_single_for_device(ctx->eip93->dev, ctx->sa_record_base_out,
++				   sizeof(struct sa_record), DMA_TO_DEVICE);
++	dma_sync_single_for_device(ctx->eip93->dev, ctx->sa_record_base_in,
++				   sizeof(struct sa_record), DMA_TO_DEVICE);
+ 
+ 	return 0;
+ }
