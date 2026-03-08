@@ -1,0 +1,55 @@
+--- a/drivers/crypto/inside-secure/eip93/eip93-common.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-common.c
+@@ -103,19 +103,27 @@ int eip93_put_descriptor(struct eip93_de
+ {
+ 	struct eip93_descriptor *cdesc;
+ 	struct eip93_descriptor *rdesc;
++	unsigned long irqflags;
++
++	spin_lock_irqsave(&eip93->ring->write_lock, irqflags);
+ 
+ 	rdesc = eip93_ring_next_wptr(eip93, &eip93->ring->rdr);
+-	if (IS_ERR(rdesc))
++	if (IS_ERR(rdesc)) {
++		spin_unlock_irqrestore(&eip93->ring->write_lock, irqflags);
+ 		return -ENOENT;
++	}
+ 
+ 	cdesc = eip93_ring_next_wptr(eip93, &eip93->ring->cdr);
+-	if (IS_ERR(cdesc))
++	if (IS_ERR(cdesc)) {
++		spin_unlock_irqrestore(&eip93->ring->write_lock, irqflags);
+ 		return -ENOENT;
++	}
+ 
+ 	memset(rdesc, 0, sizeof(struct eip93_descriptor));
+-
+ 	memcpy(cdesc, desc, sizeof(struct eip93_descriptor));
+ 
++	spin_unlock_irqrestore(&eip93->ring->write_lock, irqflags);
++
+ 	return 0;
+ }
+ 
+@@ -503,8 +511,7 @@ static int eip93_scatter_combine(struct
+ 		 * Maybe refine by slowing down at EIP93_RING_BUSY
+ 		 */
+ again:
+-		scoped_guard(spinlock_irqsave, &eip93->ring->write_lock)
+-			err = eip93_put_descriptor(eip93, cdesc);
++		err = eip93_put_descriptor(eip93, cdesc);
+ 		if (err) {
+ 			usleep_range(EIP93_RING_BUSY_DELAY,
+ 				     EIP93_RING_BUSY_DELAY * 2);
+--- a/drivers/crypto/inside-secure/eip93/eip93-hash.c
++++ b/drivers/crypto/inside-secure/eip93/eip93-hash.c
+@@ -268,8 +268,7 @@ static int eip93_send_hash_req(struct cr
+ 	}
+ 
+ again:
+-	scoped_guard(spinlock_irqsave, &eip93->ring->write_lock)
+-		ret = eip93_put_descriptor(eip93, &cdesc);
++	ret = eip93_put_descriptor(eip93, &cdesc);
+ 	if (ret) {
+ 		usleep_range(EIP93_RING_BUSY_DELAY,
+ 			     EIP93_RING_BUSY_DELAY * 2);
